@@ -1,0 +1,23 @@
+[Unit]
+Description=Heatingrod Controller v3 (Rust)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/heatingrod-rust
+# 1-Wire Kernel-w1 Testlauf (04.09.2026): Module nur für v3 laden, kein
+# systemweites modules-load.d — Revert = Zeilen entfernen + rmmod.
+ExecStartPre=/sbin/modprobe wire
+ExecStartPre=/sbin/modprobe ds2490
+ExecStartPre=/sbin/modprobe w1_therm
+ExecStart=/root/heatingrod-rust/heatingrod --config /root/heatingrod-rust/production.yaml
+# Hardware failsafe: after the daemon exits (crash included), force the DAC
+# to CH0=0V / CH1=6V via raw I2C — replaces the Python smbus2 one-liner of v2.
+ExecStopPost=/root/heatingrod-rust/tools/dac-safe
+SyslogIdentifier=heatingrod
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

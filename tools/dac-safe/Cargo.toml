@@ -1,0 +1,10 @@
+[package]
+name = "dac-safe"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Hardware failsafe: GP8403 → CH0=0V, CH1=6V via raw I2C (systemd ExecStopPost)"
+license.workspace = true
+
+[dependencies]
+i2cdev = "0.6"

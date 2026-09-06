@@ -1,0 +1,22 @@
+[package]
+name = "heatingrod"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Heatingrod controller v3: PV-surplus heating rod controller (Rust port)"
+license.workspace = true
+
+[dependencies]
+esphome-api-server = { path = "../esphome-api-server" }
+esphome-native-api.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde.workspace = true
+serde_yaml.workspace = true
+serde_json.workspace = true
+libc = "0.2"
+# No default features: libudev is only needed for port enumeration, which we
+# never use (paths from config) — and it breaks zigbuild cross-compilation.
+serialport = { version = "4", default-features = false }
+i2cdev = "0.6"

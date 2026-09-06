@@ -1,0 +1,55 @@
+# Rust test device — runs in PARALLEL to the Python production controller.
+#
+# - MAC: own MAC of the macvlan interface ethx (≠ production MAC
+#   B8:27:EB:96:AE:00 = eth0 → separate HA config entry, no registry collision)
+# - Port 6054 + bind 192.168.203.199: production holds 6053 on 0.0.0.0
+# - PSK below is a THROWAWAY key for the test device only (not production).
+
+esphome:
+  name: heatingrod-test
+  friendly_name: "Heizstab Rust Test"
+  comment: "Rust-Port Testgerät (Phase 1)"
+  mac_interface: ethx
+  project:
+    name: custom.heatingrod
+    version: "2.0.0"
+
+api:
+  port: 6054
+  bind_address: 192.168.203.199
+  encryption:
+    key: "bD4I6pabWgEeRxaPhyIn/vX2HAY4KN/b+KzJHMFql/M="
+
+devices:
+  - id: 1
+    name: "DS100 Energiezähler"
+  - id: 2
+    name: "Thyristorsteller"
+
+sensor:
+  - platform: controller
+    name: "Uptime"
+    object_id: rust_uptime
+    field: uptime
+    unit_of_measurement: s
+    device_class: duration
+    state_class: measurement
+    device_id: 0
+
+number:
+  - name: "Test Power Limit"
+    object_id: rust_power_limit
+    min_value: 0
+    max_value: 7500
+    step: 100
+    unit_of_measurement: W
+    device_class: power
+    device_id: 2
+
+climate:
+  - platform: dac
+    name: "Test Heizkessel HK1"
+    object_id: rust_test_klima
+    channel: 1
+    default_target_temperature: 60
+    device_id: 0

@@ -1,0 +1,509 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "DS100 Heizstab Energiezähler — Leistung, Spannung, Strom, Energie, Regelung",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Aktueller Status",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 3000 },
+            { "color": "orange", "value": 5000 },
+            { "color": "red", "value": 7000 }
+          ]},
+          "unit": "watt", "min": 0, "max": 8000
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "pluginVersion": "12.1.1",
+      "targets": [{
+        "alias": "Leistung",
+        "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+        "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }],
+        "measurement": "W",
+        "orderByTime": "ASC",
+        "policy": "default",
+        "refId": "A",
+        "resultFormat": "time_series",
+        "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]],
+        "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_power" }]
+      }],
+      "title": "Leistung",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "blue", "value": null },
+            { "color": "green", "value": 220 },
+            { "color": "red", "value": 245 }
+          ]},
+          "unit": "volt", "min": 200, "max": 260
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "options": { "minVizHeight": 75, "minVizWidth": 75, "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showThresholdLabels": false, "showThresholdMarkers": true, "sizing": "auto" },
+      "pluginVersion": "12.1.1",
+      "targets": [{
+        "alias": "Spannung",
+        "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+        "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }],
+        "measurement": "V",
+        "orderByTime": "ASC",
+        "policy": "default",
+        "refId": "A",
+        "resultFormat": "time_series",
+        "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]],
+        "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_voltage_avg" }]
+      }],
+      "title": "Spannung (L-N ∅)",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 49.8 },
+            { "color": "red", "value": 50.2 }
+          ]},
+          "unit": "hertz", "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "pluginVersion": "12.1.1",
+      "targets": [{
+        "alias": "Frequenz",
+        "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+        "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }],
+        "measurement": "Hz",
+        "orderByTime": "ASC",
+        "policy": "default",
+        "refId": "A",
+        "resultFormat": "time_series",
+        "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]],
+        "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_frequency" }]
+      }],
+      "title": "Netzfrequenz",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null }
+          ]},
+          "unit": "kwatth", "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "pluginVersion": "12.1.1",
+      "targets": [{
+        "alias": "Energie",
+        "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+        "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }],
+        "measurement": "kWh",
+        "orderByTime": "ASC",
+        "policy": "default",
+        "refId": "A",
+        "resultFormat": "time_series",
+        "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]],
+        "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_energy_total" }]
+      }],
+      "title": "Energie Gesamt",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 0.8 },
+            { "color": "red", "value": 0.95 }
+          ]},
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "id": 5,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "pluginVersion": "12.1.1",
+      "targets": [{
+        "alias": "cos φ",
+        "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+        "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }],
+        "measurement": "",
+        "orderByTime": "ASC",
+        "policy": "default",
+        "refId": "A",
+        "resultFormat": "time_series",
+        "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]],
+        "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_power_factor" }]
+      }],
+      "title": "Leistungsfaktor",
+      "type": "stat"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 101,
+      "title": "Leistung & Regelung",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false, "axisCenteredZero": false, "axisColorMode": "text",
+            "axisLabel": "Leistung", "axisPlacement": "auto",
+            "drawStyle": "line", "fillOpacity": 20, "gradientMode": "opacity",
+            "lineInterpolation": "smooth", "lineWidth": 2,
+            "showPoints": "never", "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "dashed" }
+          },
+          "unit": "watt",
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "transparent", "value": null },
+            { "color": "red", "value": 7500 }
+          ]}
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Leistung Gesamt" }, "properties": [
+            { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } },
+            { "id": "custom.fillOpacity", "value": 35 }
+          ]},
+          { "matcher": { "id": "byName", "options": "L1" }, "properties": [
+            { "id": "color", "value": { "fixedColor": "#F2495C", "mode": "fixed" } },
+            { "id": "custom.lineWidth", "value": 1 },
+            { "id": "custom.fillOpacity", "value": 0 }
+          ]},
+          { "matcher": { "id": "byName", "options": "L2" }, "properties": [
+            { "id": "color", "value": { "fixedColor": "#5794F2", "mode": "fixed" } },
+            { "id": "custom.lineWidth", "value": 1 },
+            { "id": "custom.fillOpacity", "value": 0 }
+          ]},
+          { "matcher": { "id": "byName", "options": "L3" }, "properties": [
+            { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } },
+            { "id": "custom.lineWidth", "value": 1 },
+            { "id": "custom.fillOpacity", "value": 0 }
+          ]},
+          { "matcher": { "id": "byName", "options": "DAC Level" }, "properties": [
+            { "id": "color", "value": { "fixedColor": "#B877D9", "mode": "fixed" } },
+            { "id": "custom.axisPlacement", "value": "right" },
+            { "id": "custom.axisLabel", "value": "DAC" },
+            { "id": "unit", "value": "percent" },
+            { "id": "custom.drawStyle", "value": "bars" },
+            { "id": "custom.fillOpacity", "value": 30 },
+            { "id": "custom.lineWidth", "value": 0 }
+          ]}
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 7 },
+      "id": 10,
+      "options": {
+        "legend": { "calcs": ["min", "max", "mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        { "alias": "Leistung Gesamt", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "W", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_power" }] },
+        { "alias": "L1", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "W", "orderByTime": "ASC", "policy": "default", "refId": "B", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_power_l1" }] },
+        { "alias": "L2", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "W", "orderByTime": "ASC", "policy": "default", "refId": "C", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_power_l2" }] },
+        { "alias": "L3", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "W", "orderByTime": "ASC", "policy": "default", "refId": "D", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_power_l3" }] },
+        { "alias": "DAC Level", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "", "orderByTime": "ASC", "policy": "default", "refId": "E", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ctrl_dac_level" }] }
+      ],
+      "title": "Heizstab Leistung pro Phase + DAC",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "id": 102,
+      "title": "Netzspannung & Strom",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false, "axisColorMode": "text",
+            "axisLabel": "Spannung", "axisPlacement": "auto",
+            "drawStyle": "line", "fillOpacity": 5, "gradientMode": "none",
+            "lineInterpolation": "smooth", "lineWidth": 2,
+            "showPoints": "never", "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "dashed" }
+          },
+          "unit": "volt", "decimals": 1,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "transparent", "value": null },
+            { "color": "yellow", "value": 207 },
+            { "color": "red", "value": 253 }
+          ]}
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "L1" }, "properties": [{ "id": "color", "value": { "fixedColor": "#F2495C", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "L2" }, "properties": [{ "id": "color", "value": { "fixedColor": "#5794F2", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "L3" }, "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "id": 20,
+      "options": {
+        "legend": { "calcs": ["min", "max", "mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        { "alias": "L1", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "V", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_voltage_l1" }] },
+        { "alias": "L2", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "V", "orderByTime": "ASC", "policy": "default", "refId": "B", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_voltage_l2" }] },
+        { "alias": "L3", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "V", "orderByTime": "ASC", "policy": "default", "refId": "C", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_voltage_l3" }] }
+      ],
+      "title": "Netzspannung L-N (V)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false, "axisColorMode": "text",
+            "axisLabel": "Strom", "axisPlacement": "auto",
+            "drawStyle": "line", "fillOpacity": 15, "gradientMode": "opacity",
+            "lineInterpolation": "smooth", "lineWidth": 2,
+            "showPoints": "never", "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "dashed" }
+          },
+          "unit": "amp", "decimals": 2,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "transparent", "value": null },
+            { "color": "red", "value": 12 }
+          ]}
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "L1" }, "properties": [{ "id": "color", "value": { "fixedColor": "#F2495C", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "L2" }, "properties": [{ "id": "color", "value": { "fixedColor": "#5794F2", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "L3" }, "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "id": 21,
+      "options": {
+        "legend": { "calcs": ["min", "max", "mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        { "alias": "L1", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "A", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_current_l1" }] },
+        { "alias": "L2", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "A", "orderByTime": "ASC", "policy": "default", "refId": "B", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_current_l2" }] },
+        { "alias": "L3", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "A", "orderByTime": "ASC", "policy": "default", "refId": "C", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_current_l3" }] }
+      ],
+      "title": "Phasenstrom (A)",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "id": 103,
+      "title": "Netzfrequenz & Leistungsfaktor",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false, "axisColorMode": "text",
+            "axisLabel": "Frequenz", "axisPlacement": "auto",
+            "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none",
+            "lineInterpolation": "smooth", "lineWidth": 2,
+            "showPoints": "never",
+            "thresholdsStyle": { "mode": "dashed" }
+          },
+          "unit": "hertz", "decimals": 2,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "transparent", "value": null },
+            { "color": "yellow", "value": 49.8 },
+            { "color": "red", "value": 50.2 }
+          ]}
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Frequenz" }, "properties": [{ "id": "color", "value": { "fixedColor": "#00D4F5", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 27 },
+      "id": 30,
+      "options": {
+        "legend": { "calcs": ["min", "max", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        { "alias": "Frequenz", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "Hz", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_frequency" }] }
+      ],
+      "title": "Netzfrequenz (Hz)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false, "axisColorMode": "text",
+            "axisLabel": "cos φ", "axisPlacement": "auto",
+            "drawStyle": "line", "fillOpacity": 15, "gradientMode": "opacity",
+            "lineInterpolation": "smooth", "lineWidth": 2,
+            "showPoints": "never",
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "decimals": 2, "min": -1, "max": 1
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Leistungsfaktor" }, "properties": [{ "id": "color", "value": { "fixedColor": "#B877D9", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 27 },
+      "id": 31,
+      "options": {
+        "legend": { "calcs": ["min", "max", "mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        { "alias": "Leistungsfaktor", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_power_factor" }] }
+      ],
+      "title": "Leistungsfaktor cos φ",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "id": 104,
+      "title": "Energie & Netzbezug durch Regelung",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false, "axisColorMode": "text",
+            "axisLabel": "Leistung", "axisPlacement": "auto",
+            "drawStyle": "line", "fillOpacity": 20, "gradientMode": "opacity",
+            "lineInterpolation": "smooth", "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "unit": "watt"
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Heizstab" }, "properties": [
+            { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } },
+            { "id": "custom.fillOpacity", "value": 30 }
+          ]},
+          { "matcher": { "id": "byName", "options": "Netzbezug" }, "properties": [
+            { "id": "color", "value": { "fixedColor": "#F2495C", "mode": "fixed" } },
+            { "id": "custom.fillOpacity", "value": 40 }
+          ]},
+          { "matcher": { "id": "byName", "options": "Einspeisung" }, "properties": [
+            { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } },
+            { "id": "custom.fillOpacity", "value": 15 }
+          ]},
+          { "matcher": { "id": "byName", "options": "PV" }, "properties": [
+            { "id": "color", "value": { "fixedColor": "#FADE2A", "mode": "fixed" } },
+            { "id": "custom.lineWidth", "value": 1 },
+            { "id": "custom.fillOpacity", "value": 10 }
+          ]}
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 35 },
+      "id": 40,
+      "options": {
+        "legend": { "calcs": ["min", "max", "mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        { "alias": "Heizstab", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "W", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "ds100_power" }] },
+        { "alias": "Netzbezug", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "W", "orderByTime": "ASC", "policy": "default", "refId": "B", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "import_power" }] },
+        { "alias": "Einspeisung", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "W", "orderByTime": "ASC", "policy": "default", "refId": "C", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "export_power" }] },
+        { "alias": "PV", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "W", "orderByTime": "ASC", "policy": "default", "refId": "D", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "total_dc_power" }] }
+      ],
+      "title": "Heizstab vs. PV & Netz — Regelverluste sichtbar",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "refresh": "10s",
+  "schemaVersion": 41,
+  "tags": ["ds100", "heizstab", "energie"],
+  "templating": { "list": [] },
+  "time": { "from": "now-12h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "DS100 Heizstab",
+  "uid": "ds100-heizstab-energiezaehler",
+  "version": 1
+}

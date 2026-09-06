@@ -1,0 +1,189 @@
+{
+  "annotations": { "list": [{ "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard" }] },
+  "description": "SOREL MTDCv5 Warmwasser & Heizstab Controller",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "id": 100, "title": "Aktueller Status", "type": "row" },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }, { "color": "green", "value": 35 }, { "color": "yellow", "value": 50 }, { "color": "orange", "value": 60 }, { "color": "red", "value": 65 }] }, "unit": "celsius", "min": 0, "max": 90 }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "minVizHeight": 75, "minVizWidth": 75, "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showThresholdLabels": false, "showThresholdMarkers": true, "sizing": "auto" },
+      "pluginVersion": "12.1.1",
+      "targets": [{ "alias": "Warmwasser", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "\u00b0C", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_warmwasser_temp" }] }],
+      "title": "Warmwasser",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 3000 }, { "color": "red", "value": 7000 }] }, "unit": "watt" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "pluginVersion": "12.1.1",
+      "targets": [{ "alias": "Leistung", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "W", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_waermeleistung" }] }],
+      "title": "W\u00e4rmeleistung",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "orange", "value": 10 }] }, "unit": "kwatth" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "pluginVersion": "12.1.1",
+      "targets": [{ "alias": "Heute", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "kWh", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_energie_tag" }] }],
+      "title": "Energie heute",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "dark-purple", "value": null }, { "color": "purple", "value": 50 }, { "color": "red", "value": 200 }] }, "max": 254 }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "pluginVersion": "12.1.1",
+      "targets": [{ "alias": "PWM", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_mischer_pwm" }] }],
+      "title": "Mischerpumpe PWM",
+      "type": "stat"
+    },
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 }, "id": 101, "title": "Temperaturen", "type": "row" },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisBorderShow": false, "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "barWidthFactor": 0.6, "drawStyle": "line", "fillOpacity": 5, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "insertNulls": false, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "dashed" } }, "min": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }, { "color": "yellow", "value": 45 }, { "color": "orange", "value": 55 }, { "color": "red", "value": 65 }] }, "unit": "celsius", "mappings": [] },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Warmwasser" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Kaltwasser" }, "properties": [{ "id": "color", "value": { "fixedColor": "#5794F2", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Zirkulation" }, "properties": [{ "id": "color", "value": { "fixedColor": "#00D4F5", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 7 },
+      "id": 10,
+      "options": { "legend": { "calcs": ["min", "max", "mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        { "alias": "Warmwasser", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "\u00b0C", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_warmwasser_temp" }] },
+        { "alias": "Kaltwasser", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "\u00b0C", "orderByTime": "ASC", "policy": "default", "refId": "B", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_kaltwasser_temp" }] },
+        { "alias": "Zirkulation", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "\u00b0C", "orderByTime": "ASC", "policy": "default", "refId": "C", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_zirkulation_temp" }] }
+      ],
+      "title": "Warmwasser / Kaltwasser / Zirkulation",
+      "type": "timeseries"
+    },
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 }, "id": 102, "title": "Pumpe & Leistung", "type": "row" },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisBorderShow": false, "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "barWidthFactor": 0.6, "drawStyle": "line", "fillOpacity": 30, "gradientMode": "opacity", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "insertNulls": false, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } }, "mappings": [] },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "PWM R3" }, "properties": [{ "id": "color", "value": { "fixedColor": "#9933CC", "mode": "fixed" } }, { "id": "custom.drawStyle", "value": "bars" }, { "id": "custom.fillOpacity", "value": 50 }, { "id": "custom.axisPlacement", "value": "left" }, { "id": "unit", "value": "none" }] },
+          { "matcher": { "id": "byName", "options": "Warmwasser" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }, { "id": "custom.axisPlacement", "value": "right" }, { "id": "unit", "value": "celsius" }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "id": 20,
+      "options": { "legend": { "calcs": ["max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        { "alias": "PWM R3", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "max" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_mischer_pwm" }] },
+        { "alias": "Warmwasser", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "\u00b0C", "orderByTime": "ASC", "policy": "default", "refId": "B", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "mean" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_warmwasser_temp" }] }
+      ],
+      "title": "Mischerpumpe vs. Temperatur",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisBorderShow": false, "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "barWidthFactor": 0.6, "drawStyle": "line", "fillOpacity": 25, "gradientMode": "opacity", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "insertNulls": false, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } }, "unit": "watt", "mappings": [] },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "W\u00e4rmeleistung" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF780A", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "VFS1" }, "properties": [{ "id": "color", "value": { "fixedColor": "#11D200", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "id": 21,
+      "options": { "legend": { "calcs": ["max", "mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        { "alias": "W\u00e4rmeleistung", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "W", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "max" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_waermeleistung" }] },
+        { "alias": "VFS1", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "W", "orderByTime": "ASC", "policy": "default", "refId": "B", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "max" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_leistung_vfs1" }] }
+      ],
+      "title": "Thermische Leistung",
+      "type": "timeseries"
+    },
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }, "id": 103, "title": "Durchfluss & Energie", "type": "row" },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisBorderShow": false, "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "barWidthFactor": 0.6, "drawStyle": "line", "fillOpacity": 15, "gradientMode": "opacity", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "insertNulls": false, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } }, "unit": "litreh", "mappings": [] },
+        "overrides": [{ "matcher": { "id": "byName", "options": "Durchfluss VFS" }, "properties": [{ "id": "color", "value": { "fixedColor": "#11D200", "mode": "fixed" } }] }]
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 27 },
+      "id": 30,
+      "options": { "legend": { "calcs": ["max", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" } },
+      "pluginVersion": "12.1.1",
+      "targets": [{ "alias": "Durchfluss VFS", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "l/min", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "max" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_durchfluss_vfs" }] }],
+      "title": "Durchfluss (VFS)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisBorderShow": false, "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "barWidthFactor": 0.6, "drawStyle": "bars", "fillOpacity": 40, "gradientMode": "scheme", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "insertNulls": false, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } }, "unit": "kwatth", "mappings": [] },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Tag" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Woche" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF780A", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Monat" }, "properties": [{ "id": "color", "value": { "fixedColor": "#E02F44", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 27 },
+      "id": 31,
+      "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        { "alias": "Tag", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "kWh", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_energie_tag" }] },
+        { "alias": "Woche", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "kWh", "orderByTime": "ASC", "policy": "default", "refId": "B", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_energie_woche" }] },
+        { "alias": "Monat", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "kWh", "orderByTime": "ASC", "policy": "default", "refId": "C", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "last" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_energie_monat" }] }
+      ],
+      "title": "Energieverbrauch",
+      "type": "timeseries"
+    },
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 }, "id": 104, "title": "Relais & System", "type": "row" },
+    {
+      "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisBorderShow": false, "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "barWidthFactor": 0.6, "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "insertNulls": false, "lineInterpolation": "stepAfter", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } }, "mappings": [] },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "R0 Hauptpumpe" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "R3 Mischer" }, "properties": [{ "id": "color", "value": { "fixedColor": "#9933CC", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 35 },
+      "id": 40,
+      "options": { "legend": { "calcs": ["max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        { "alias": "R0 Hauptpumpe", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "", "orderByTime": "ASC", "policy": "default", "refId": "A", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "max" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_pumpe_r0" }] },
+        { "alias": "R3 Mischer", "datasource": { "type": "influxdb", "uid": "ea499dda-4caf-4a85-af67-3c49f383bbfa" }, "groupBy": [{ "params": ["$__interval"], "type": "time" }, { "params": ["previous"], "type": "fill" }], "measurement": "", "orderByTime": "ASC", "policy": "default", "refId": "B", "resultFormat": "time_series", "select": [[{ "params": ["value"], "type": "field" }, { "params": [], "type": "max" }]], "tags": [{ "key": "entity_id::tag", "operator": "=", "value": "sorel_mischer_pwm" }] }
+      ],
+      "title": "Relais-Status",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["sorel", "warmwasser", "heizung"],
+  "templating": { "list": [] },
+  "time": { "from": "now-12h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "SOREL Warmwasser",
+  "uid": "sorel-mtdc-v5-warmwasser",
+  "version": 1
+}

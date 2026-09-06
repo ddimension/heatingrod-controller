@@ -1,0 +1,24 @@
+[package]
+name = "esphome-api-server"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "ESPHome Native API server domain layer (entity registry, state cache, command dispatch) on top of esphome-native-api"
+license.workspace = true
+
+[dependencies]
+esphome-native-api.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+md-5.workspace = true
+hex.workspace = true
+libc = "0.2"
+
+[dev-dependencies]
+# Hand-written wire-level client for protocol regression tests (mirrors
+# aioesphomeserver/tests/test_noise.py: initiator side of Noise_NNpsk0,
+# exact frame sequence).
+noise-protocol = "0.2"
+noise-rust-crypto = "0.6"
+base64 = "0.22"
+prost = "0.13"

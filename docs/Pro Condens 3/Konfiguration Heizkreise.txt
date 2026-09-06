@@ -1,0 +1,59 @@
+Konfig und Status Heizung:
+Konfig:
+
+Pufferspeicher
++----------------+
+| Oben 80,5°C    | <- HK-1 (speicherlast / Hochtemperatur)
+| Unten 50°C     |
++----------------+
+       |
+       +-> HK-2 Pumpe (Heizkörperversorgung, witterungsgeführt)
+       +-> HK-1 Pumpe (aktiv, wenn Speicher laden nötig)
+Frischwasserstation: autark direkt am Speicher
+Kessel: nur bei Bedarf
+
+HK-1:
+ Betriebart: Uhrzeit
+ Absenkung: 8°C
+ Uhrzeit Mo-So 06:00 bis 23:00
+ Fusspunkt: 30°C
+ Heizbetrieb unter: 20
+ Absenkbetrieb unter: 10
+
+HK-2:
+ Betriebart: Uhezeit
+ Absenkung: 5°C
+ Uhrzeit Mo-So 06:00 bis 23:00
+ Fusspunkt: 35°C
+ Heizbetrieb unter: 20
+ Absenkbetrieb unter: 20
+
+Boiler:
+ Solltemperatur: 60°C
+ Absenkung: 5
+ Heizzeiten: 05:30 bis 09:30, 16:00 bis 20:30
+ 
+ 
+Statusinfos:
+ Pumpen:
+  Kessellpumpe: aus
+  Boilerpumpte: aus
+  HK-1 Pumpe: aus
+  HK-2 Pumpe: EIN
+ Temperaturen:
+  Kessel 86.5
+  Ressel Rücklauf 69.5
+  Boiler ist: 80
+  Boiler soll: 60
+  Abgas: 32.5
+  HK-2 ist: 59
+  HK-2 soll ist: 47
+  Außen: 6
+  Puffer unten: 50
+  Puffer oben: 80.5
+  HK-1 ist: 77.5
+  Fernsteller1: -3
+  Steuerung 33.5
+  
+Frischwasserstation am Speicher direkt, autark
+

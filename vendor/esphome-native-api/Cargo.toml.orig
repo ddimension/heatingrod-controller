@@ -1,0 +1,130 @@
+[package]
+name = "esphome-native-api"
+version = "3.0.0"
+edition = "2024"
+license = "MIT"
+keywords = ["esphome", "homeassistant"]
+categories = ["api-bindings"]
+homepage = "https://github.com/UbiHome/esphome-native-api"
+repository = "https://github.com/UbiHome/esphome-native-api"
+documentation = "https://docs.rs/esphome-native-api"
+readme = "README.md"
+description = "Rust implementation of the ESPHome native API for communication with ESPHome devices, supporting both encrypted and plaintext connections."
+include = [
+    "/LICENSE",
+    "/README.md",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/src/*",
+    "!/src/proto/.gitignore"
+]
+
+[dependencies]
+log = "0.4"
+tokio = { version = "1", features = ["full"] }
+prost = "0.13.5"
+typed-builder = "0.21.0"
+constant_time_eq = "0.4.2"
+base64 = "0.22.1"
+noise-rust-crypto = "0.6.2"
+noise-protocol = "0.2.0"
+byteorder = "1.5.0"
+tokio-util = { version = "0.7.17", features = ["codec"]  }
+tokio-stream = "0.1.17"
+bytes = "1.11.0"
+futures = "0.3.31"
+thiserror = "2"
+
+[workspace]
+resolver = "2"
+members = ["generator"]
+
+[dev-dependencies]
+pretty_env_logger = "0.5.0"
+test-log = { version = "0.2.16", features = ["log", "color"] }
+
+[features]
+default = ["std", "version_2026_6_2"]
+std = []
+version_2026_6_5 = []
+version_2026_6_4 = []
+version_2026_6_3 = []
+version_2026_6_2 = []
+version_2026_6_1 = []
+version_2026_6_0 = []
+version_2026_5_3 = []
+version_2026_5_2 = []
+version_2026_5_1 = []
+version_2026_5_0 = []
+version_2026_4_5 = []
+version_2026_4_4 = []
+version_2026_4_3 = []
+version_2026_4_2 = []
+version_2026_4_1 = []
+version_2026_4_0 = []
+version_2026_3_3 = []
+version_2026_3_2 = []
+version_2026_3_1 = []
+version_2026_3_0 = []
+version_2026_2_4 = []
+version_2026_2_3 = []
+version_2026_2_2 = []
+version_2026_2_1 = []
+version_2026_2_0 = []
+version_2026_1_5 = []
+version_2026_1_4 = []
+version_2026_1_3 = []
+version_2026_1_2 = []
+version_2026_1_1 = []
+version_2026_1_0 = []
+version_2025_12_7 = []
+version_2025_12_6 = []
+version_2025_12_5 = []
+version_2025_12_4 = []
+version_2025_12_3 = []
+version_2025_12_2 = []
+version_2025_12_1 = []
+version_2025_12_0 = []
+version_2025_11_5 = []
+version_2025_11_4 = []
+version_2025_11_3 = []
+version_2025_11_2 = []
+version_2025_11_1 = []
+version_2025_11_0 = []
+version_2025_10_5 = []
+version_2025_10_4 = []
+version_2025_10_3 = []
+version_2025_10_2 = []
+version_2025_10_1 = []
+version_2025_10_0 = []
+version_2025_9_3 = []
+version_2025_9_2 = []
+version_2025_9_1 = []
+version_2025_9_0 = []
+version_2025_8_4 = []
+version_2025_8_3 = []
+version_2025_8_2 = []
+version_2025_8_1 = []
+version_2025_8_0 = []
+version_2025_7_5 = []
+version_2025_7_4 = []
+version_2025_7_3 = []
+version_2025_7_2 = []
+version_2025_7_1 = []
+version_2025_7_0 = []
+version_2025_6_3 = []
+version_2025_6_2 = []
+version_2025_6_1 = []
+version_2025_6_0 = []
+version_2025_5_2 = []
+version_2025_5_1 = []
+version_2025_5_0 = []
+version_2025_4_2 = []
+version_2025_4_1 = []
+version_2025_4_0 = []
+version_2025_3_3 = []
+version_2025_3_2 = []
+version_2025_3_1 = []
+version_2025_3_0 = []
+version_2025_2_2 = []
+version_2025_2_1 = []

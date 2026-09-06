@@ -1,0 +1,663 @@
+# SANITIZED COPY of production.yaml for tests/CI — placeholders instead of real PSKs.
+# Structure is identical to the real config (verified: only key/noise_psk values differ).
+
+esphome:
+  name: heatingrod
+  friendly_name: Heizstab Controller
+  comment: PV-Überschuss Heizstab Controller
+  mac_address: B8:27:EB:96:AE:00
+  project:
+    name: custom.heatingrod
+    version: 2.0.0
+api:
+  port: 6053
+  encryption:
+    key: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+dac:
+  i2c_address: 0x5f
+  mock: false
+  max_voltage: 10.0
+  ch1_safe_celsius: 60
+ha_entities:
+  grid_power: sensor.powerlogger_aktueller_verbrauch
+  heatingrod_power: sensor.heizstab_leistung
+  heatingrod_temperature: sensor.1w_heizstab_temp
+  tank_top_temperature: sensor.speicher_oben_temperatur
+  pv_dc_power: sensor.total_dc_power
+  export_power_raw: sensor.export_power_raw
+  balkonpv_power: sensor.balkonpv_total_ac_output_power_active
+  heatingrod_switch: input_boolean.heizstab_schalter
+control:
+  mode: calibration
+  step_interval: 0.1
+  step_initial_voltage: 1.0
+  power_limit_start: -800
+  power_limit_stop: -600
+  max_power_watts: 7500
+  power_use_factor: 0.9
+  tank_temp_limit: 85.0
+  sensor_max_age_seconds: 60
+  watchdog_interval: 10
+  feedback_tolerance_watts: 100
+  feedback_damping: 0.3
+  max_voltage_step: 0.5
+  step_settle_time: 7
+calibration:
+  file_path: calibration.json
+  steps: 6
+  step_duration: 30
+  min_power_for_calibration: 1000
+  max_age_days: 7
+  deviation_threshold: 0.30
+  ewma_alpha: 0.3
+devices:
+- id: 1
+  name: DS100 Energiezähler
+- id: 2
+  name: Thyristorsteller
+- id: 3
+  name: SOREL MTDCv5
+- id: 4
+  name: 1-Wire Temperatursensoren
+- id: 5
+  name: ProControl 3
+sensor:
+- platform: ds100
+  name: DS100 Wirkleistung
+  object_id: ds100_power
+  field: power_combined
+  unit_of_measurement: W
+  device_class: power
+  device_id: 1
+- platform: ds100
+  name: DS100 Wirkleistung L1
+  object_id: ds100_power_l1
+  field: power_l1
+  unit_of_measurement: W
+  device_class: power
+  device_id: 1
+- platform: ds100
+  name: DS100 Wirkleistung L2
+  object_id: ds100_power_l2
+  field: power_l2
+  unit_of_measurement: W
+  device_class: power
+  device_id: 1
+- platform: ds100
+  name: DS100 Wirkleistung L3
+  object_id: ds100_power_l3
+  field: power_l3
+  unit_of_measurement: W
+  device_class: power
+  device_id: 1
+- platform: ds100
+  name: DS100 Scheinleistung
+  object_id: ds100_apparent
+  field: apparent_combined
+  unit_of_measurement: VA
+  device_class: apparent_power
+  device_id: 1
+- platform: ds100
+  name: DS100 Scheinleistung L1
+  object_id: ds100_apparent_l1
+  field: apparent_l1
+  unit_of_measurement: VA
+  device_class: apparent_power
+  device_id: 1
+- platform: ds100
+  name: DS100 Scheinleistung L2
+  object_id: ds100_apparent_l2
+  field: apparent_l2
+  unit_of_measurement: VA
+  device_class: apparent_power
+  device_id: 1
+- platform: ds100
+  name: DS100 Scheinleistung L3
+  object_id: ds100_apparent_l3
+  field: apparent_l3
+  unit_of_measurement: VA
+  device_class: apparent_power
+  device_id: 1
+- platform: ds100
+  name: DS100 Blindleistung
+  object_id: ds100_reactive
+  field: reactive_combined
+  unit_of_measurement: var
+  device_class: reactive_power
+  device_id: 1
+- platform: ds100
+  name: DS100 Blindleistung L1
+  object_id: ds100_reactive_l1
+  field: reactive_l1
+  unit_of_measurement: var
+  device_class: reactive_power
+  device_id: 1
+- platform: ds100
+  name: DS100 Blindleistung L2
+  object_id: ds100_reactive_l2
+  field: reactive_l2
+  unit_of_measurement: var
+  device_class: reactive_power
+  device_id: 1
+- platform: ds100
+  name: DS100 Blindleistung L3
+  object_id: ds100_reactive_l3
+  field: reactive_l3
+  unit_of_measurement: var
+  device_class: reactive_power
+  device_id: 1
+- platform: ds100
+  name: DS100 Spannung L1
+  object_id: ds100_voltage_l1
+  field: voltage_l1
+  unit_of_measurement: V
+  device_class: voltage
+  accuracy_decimals: 1
+  device_id: 1
+- platform: ds100
+  name: DS100 Spannung L2
+  object_id: ds100_voltage_l2
+  field: voltage_l2
+  unit_of_measurement: V
+  device_class: voltage
+  accuracy_decimals: 1
+  device_id: 1
+- platform: ds100
+  name: DS100 Spannung L3
+  object_id: ds100_voltage_l3
+  field: voltage_l3
+  unit_of_measurement: V
+  device_class: voltage
+  accuracy_decimals: 1
+  device_id: 1
+- platform: ds100
+  name: DS100 Spannung Avg
+  object_id: ds100_voltage_avg
+  field: voltage_ln_avg
+  unit_of_measurement: V
+  device_class: voltage
+  accuracy_decimals: 1
+  device_id: 1
+- platform: ds100
+  name: DS100 Strom L1
+  object_id: ds100_current_l1
+  field: current_l1
+  unit_of_measurement: A
+  device_class: current
+  accuracy_decimals: 3
+  device_id: 1
+- platform: ds100
+  name: DS100 Strom L2
+  object_id: ds100_current_l2
+  field: current_l2
+  unit_of_measurement: A
+  device_class: current
+  accuracy_decimals: 3
+  device_id: 1
+- platform: ds100
+  name: DS100 Strom L3
+  object_id: ds100_current_l3
+  field: current_l3
+  unit_of_measurement: A
+  device_class: current
+  accuracy_decimals: 3
+  device_id: 1
+- platform: ds100
+  name: DS100 Strom Gesamt
+  object_id: ds100_current_total
+  field: current_combined
+  unit_of_measurement: A
+  device_class: current
+  accuracy_decimals: 3
+  device_id: 1
+- platform: ds100
+  name: DS100 Frequenz
+  object_id: ds100_frequency
+  field: frequency
+  unit_of_measurement: Hz
+  device_class: frequency
+  accuracy_decimals: 1
+  device_id: 1
+- platform: ds100
+  name: DS100 Leistungsfaktor
+  object_id: ds100_power_factor
+  field: power_factor
+  device_class: power_factor
+  accuracy_decimals: 2
+  device_id: 1
+- platform: ds100
+  name: DS100 Energie Gesamt
+  object_id: ds100_energy_total
+  field: energy_total_active
+  unit_of_measurement: kWh
+  device_class: energy
+  state_class: total_increasing
+  accuracy_decimals: 2
+  icon: mdi:lightning-bolt
+  device_id: 1
+- platform: ds100
+  name: DS100 Energie Bezug
+  object_id: ds100_energy_forward
+  field: energy_forward_active
+  unit_of_measurement: kWh
+  device_class: energy
+  state_class: total_increasing
+  accuracy_decimals: 2
+  device_id: 1
+- platform: ds100
+  name: DS100 Energie Einspeisung
+  object_id: ds100_energy_reverse
+  field: energy_reverse_active
+  unit_of_measurement: kWh
+  device_class: energy
+  state_class: total_increasing
+  accuracy_decimals: 2
+  device_id: 1
+- platform: ds100
+  name: DS100 Demand Forward
+  object_id: ds100_demand_forward
+  field: demand_forward
+  unit_of_measurement: W
+  device_class: power
+  device_id: 1
+- platform: ds100
+  name: DS100 Demand Total
+  object_id: ds100_demand_total
+  field: demand_total
+  unit_of_measurement: W
+  device_class: power
+  device_id: 1
+- platform: ds100
+  name: DS100 Max Demand Forward
+  object_id: ds100_demand_max_forward
+  field: demand_max_forward
+  unit_of_measurement: W
+  device_class: power
+  device_id: 1
+- platform: ds100
+  name: DS100 Max Demand Total
+  object_id: ds100_demand_max_total
+  field: demand_max_total
+  unit_of_measurement: W
+  device_class: power
+  device_id: 1
+- platform: ds100
+  name: DS100 Energie Reaktiv Gesamt
+  object_id: ds100_energy_reactive_total
+  field: energy_total_reactive
+  unit_of_measurement: kWh
+  device_class: energy
+  state_class: total_increasing
+  accuracy_decimals: 2
+  device_id: 1
+- platform: ds100
+  name: DS100 Energie Reaktiv Bezug
+  object_id: ds100_energy_reactive_forward
+  field: energy_forward_reactive
+  unit_of_measurement: kWh
+  device_class: energy
+  state_class: total_increasing
+  accuracy_decimals: 2
+  device_id: 1
+- platform: ds100
+  name: DS100 Energie Reaktiv Einspeisung
+  object_id: ds100_energy_reactive_reverse
+  field: energy_reverse_reactive
+  unit_of_measurement: kWh
+  device_class: energy
+  state_class: total_increasing
+  accuracy_decimals: 2
+  device_id: 1
+- platform: controller
+  name: Steuerung DAC Level
+  object_id: ctrl_dac_level
+  field: dac_level
+  unit_of_measurement: '%'
+  icon: mdi:gauge
+  device_id: 2
+- platform: controller
+  name: Steuerung DAC Spannung
+  object_id: ctrl_dac_voltage
+  field: dac_voltage
+  unit_of_measurement: V
+  device_class: voltage
+  accuracy_decimals: 2
+  device_id: 2
+- platform: controller
+  name: Steuerung Netzleistung
+  object_id: ctrl_grid_power
+  field: grid_power
+  unit_of_measurement: W
+  device_class: power
+  device_id: 0
+- platform: controller
+  name: Steuerung PV Leistung
+  object_id: ctrl_pv_power
+  field: pv_power
+  unit_of_measurement: W
+  device_class: power
+  device_id: 0
+- platform: controller
+  name: Steuerung Netzmehrbezug
+  object_id: ctrl_overdraw
+  field: overdraw
+  unit_of_measurement: W
+  device_class: power
+  device_id: 0
+- platform: controller
+  name: Steuerung Netzmehrbezug Energie
+  object_id: ctrl_overdraw_energy
+  field: overdraw_energy
+  unit_of_measurement: Wh
+  device_class: energy
+  state_class: total_increasing
+  accuracy_decimals: 1
+  device_id: 0
+- platform: controller
+  name: Steuerung Regeldelay
+  object_id: ctrl_feedback_delay
+  field: feedback_delay
+  unit_of_measurement: ms
+  device_id: 0
+- platform: controller
+  name: Steuerung Laufzeit
+  object_id: ctrl_uptime
+  field: uptime
+  unit_of_measurement: s
+  device_class: duration
+  state_class: total_increasing
+  device_id: 0
+- platform: controller
+  name: Steuerung CO2 Ersparnis
+  object_id: ctrl_co2_saved
+  field: co2_saved
+  unit_of_measurement: kg
+  state_class: total_increasing
+  accuracy_decimals: 1
+  icon: mdi:molecule-co2
+  device_id: 0
+- platform: controller
+  name: Steuerung Betriebszustand
+  object_id: ctrl_state
+  field: state
+  icon: mdi:information-outline
+  entity_type: text_sensor
+  device_id: 0
+- platform: sorel
+  name: SOREL Warmwasser
+  object_id: sorel_warmwasser_temp
+  topic: ltdc/DLG_SENSOR/Warmwasser
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer-water
+  device_id: 3
+- platform: sorel
+  name: SOREL Kaltwasser
+  object_id: sorel_kaltwasser_temp
+  topic: ltdc/DLG_SENSOR/Kaltwasser
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:snowflake-thermometer
+  device_id: 3
+- platform: sorel
+  name: SOREL Zirkulation
+  object_id: sorel_zirkulation_temp
+  topic: ltdc/DLG_SENSOR/Zirkulation
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:pump
+  device_id: 3
+- platform: sorel
+  name: SOREL Durchfluss VFS
+  object_id: sorel_durchfluss_vfs
+  topic: ltdc/DLG_SENSOR/Durchfluss_VFS
+  unit_of_measurement: l/min
+  accuracy_decimals: 1
+  icon: mdi:water-pump
+  device_id: 3
+- platform: sorel
+  name: SOREL Wärmeleistung
+  object_id: sorel_waermeleistung
+  topic: ltdc/DLG_STATISTIC/Waermeleistung
+  unit_of_measurement: W
+  device_class: power
+  icon: mdi:fire
+  device_id: 3
+- platform: sorel
+  name: SOREL Leistung VFS1
+  object_id: sorel_leistung_vfs1
+  topic: ltdc/DLG_STATISTIC/Leistung_VFS1
+  unit_of_measurement: W
+  device_class: power
+  device_id: 3
+- platform: sorel
+  name: SOREL Energie Tag
+  object_id: sorel_energie_tag
+  topic: ltdc/DLG_OVERVIEW/tag
+  unit_of_measurement: kWh
+  device_class: energy
+  state_class: total_increasing
+  icon: mdi:counter
+  device_id: 3
+- platform: sorel
+  name: SOREL Energie Woche
+  object_id: sorel_energie_woche
+  topic: ltdc/DLG_OVERVIEW/woche
+  unit_of_measurement: kWh
+  device_class: energy
+  state_class: total_increasing
+  device_id: 3
+- platform: sorel
+  name: SOREL Energie Monat
+  object_id: sorel_energie_monat
+  topic: ltdc/DLG_OVERVIEW/monat
+  unit_of_measurement: kWh
+  device_class: energy
+  state_class: total_increasing
+  device_id: 3
+- platform: sorel
+  name: SOREL Energie Jahr
+  object_id: sorel_energie_jahr
+  topic: ltdc/DLG_OVERVIEW/jahr
+  unit_of_measurement: kWh
+  device_class: energy
+  state_class: total_increasing
+  device_id: 3
+- platform: sorel
+  name: SOREL Energie Gesamt
+  object_id: sorel_energie_gesamt
+  topic: ltdc/DLG_OVERVIEW/gesamt
+  unit_of_measurement: kWh
+  device_class: energy
+  state_class: total_increasing
+  icon: mdi:lightning-bolt
+  device_id: 3
+- platform: sorel
+  name: SOREL Mischerpumpe PWM (R3)
+  object_id: sorel_mischer_pwm
+  topic: ltdc/DLG_RELAY/3/pwm
+  icon: mdi:fan
+  device_id: 3
+- platform: sorel
+  name: SOREL Relais R4 PWM
+  object_id: sorel_relais_r4_pwm
+  topic: ltdc/DLG_RELAY/4/pwm
+  device_id: 3
+- platform: onewire
+  name: 1-Wire Speicher oben
+  object_id: 1w_speicher_oben_temp
+  address: 28.FF110F721603
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+- platform: onewire
+  name: 1-Wire Speicher Vorlauf
+  object_id: 1w_speicher_vorlauf_temp
+  address: 28.FF7296711605
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+- platform: onewire
+  name: 1-Wire Heizstab
+  object_id: 1w_heizstab_temp
+  address: 28.FFFC03711603
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+- platform: onewire
+  name: 1-Wire Speicher Rücklauf
+  object_id: 1w_speicher_ruecklauf_temp
+  address: 28.FFD9DF711604
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+- platform: onewire
+  name: 1-Wire Heizung Vorlauf
+  object_id: 1w_heizung_vorlauf_temp
+  address: 28.FFDD82711605
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+- platform: onewire
+  name: 1-Wire Heizung Rücklauf
+  object_id: 1w_heizung_ruecklauf_temp
+  address: 28.FF9B40721603
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+- platform: onewire
+  name: 1-Wire Keller
+  object_id: 1w_keller_temp
+  address: 28.FF6E15721603
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+- platform: onewire
+  name: 1-Wire Keller Speicher
+  object_id: 1w_keller_speicher_temp
+  address: 28.FFE0DB701603
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+- platform: onewire
+  name: 1-Wire Box Dallas 1
+  object_id: 1w_box_dallas_1_temp
+  address: 28.27B1BC000000
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+- platform: onewire
+  name: 1-Wire Box Dallas 2
+  object_id: 1w_box_dallas_2_temp
+  address: 28.27A7BC000000
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+- platform: onewire
+  name: 1-Wire Box Lufteinlass
+  object_id: 1w_box_lufteinlass_temp
+  address: 28.ADFBBC000000
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+- platform: onewire
+  name: 1-Wire Box Luftstrom
+  object_id: 1w_box_luftstrom_temp
+  address: 28.6A01BD000000
+  unit_of_measurement: °C
+  device_class: temperature
+  accuracy_decimals: 1
+  icon: mdi:thermometer
+  device_id: 4
+binary_sensor:
+- platform: sorel
+  name: SOREL Hauptpumpe (R0)
+  object_id: sorel_pumpe_r0
+  topic: ltdc/DLG_RELAY/0/switched
+  device_class: running
+  icon: mdi:pump
+  device_id: 3
+- platform: sorel
+  name: SOREL Relais R1
+  object_id: sorel_relais_r1
+  topic: ltdc/DLG_RELAY/1/switched
+  device_id: 3
+- platform: sorel
+  name: SOREL Relais R2
+  object_id: sorel_relais_r2
+  topic: ltdc/DLG_RELAY/2/switched
+  device_id: 3
+powerlogger:
+  host: powerlogger.kalnet.hooya.de
+  entity_object_id: aktueller_verbrauch
+  port: 6053
+  noise_psk: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+climate:
+- platform: dac
+  name: Heizkessel HK1
+  object_id: heizkessel_hk1
+  device_id: 5
+  channel: 1
+  current_temperature_entity: sensor.speicher_heizung_vorlauf_temperatur
+  supported_modes:
+  - false
+  - heat
+  visual_min_temperature: 0
+  visual_max_temperature: 100
+  visual_temperature_step: 1
+  default_target_temperature: 60
+  icon: mdi:boiler
+kaskade:
+  enabled: true
+  host: esp-heizung-ksk.kalnet.hooya.de
+  port: 6053
+  noise_psk: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+  switch_object_id: pro_condens_brennersperre
+ds100:
+  serial_port: /dev/serial/by-id/usb-FTDI_USB_Serial_Converter_FTB6SPL3-if00-port0
+onewire:
+  sensor_names:
+    28.FF110F721603: Speicher oben
+    28.FF7296711605: Speicher Vorlauf
+    28.FFFC03711603: Heizstab
+    28.FFD9DF711604: Speicher Rücklauf
+    28.FFDD82711605: Heizung Vorlauf
+    28.FF9B40721603: Heizung Rücklauf
+    28.FF6E15721603: Keller
+    28.FFE0DB701603: Keller Speicher
+    28.27B1BC000000: Box Dallas 1
+    28.6A01BD000000: Box Dallas 2
+    28.ADFBBC000000: Box Lufteinlass
+    28.27A7BC000000: Box Luftstrom
+canbus:
+  serial_port: /dev/serial/by-id/usb-Microchip_Technology__Inc._USBtin_A0215B51-if00
+  sensor_names:
+    0: Kaltwasser
+    1: Zirkulation
+    6: Warmwasser
+    7: Durchfluss_VFS
