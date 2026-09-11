@@ -289,3 +289,9 @@ PyScript: climate.set_temperature(..., temperature=60)
 - **Ausgelagerte Pakete** (aioesphomeserver, ds100-modbus, sorel-canbus): eigenständige
   Projekte, werden vom Rust-Port nicht gebraucht (nur Python-v2-Abhängigkeiten)
 - **OpenWrt-Package**: `ddimension-openwrt-repo/heatingrod/` — Source-Tarball aus diesem Repo
+  (`files/heatingrod-<version>.tar.xz`, `PKG_HASH` im Makefile). Neu erzeugen und
+  eintragen: Anleitung in `heatingrod/README.md` des Feeds; Regeln für jede
+  Feed-Änderung in dessen `CLAUDE.md` — committet wird auf `main`, `stable` bekommt
+  es nur per `scripts/release-stable.sh` und nur auf Ansage. Das Paket wird von der
+  Feed-CI **nicht** gebaut (rust/host aus Quellen, ~35–45 GB) — lokal testen:
+  `RELEASES=snapshot ARCHS=x86_64 PACKAGES=heatingrod scripts/local-build.sh`.
