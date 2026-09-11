@@ -294,4 +294,5 @@ PyScript: climate.set_temperature(..., temperature=60)
   Feed-Änderung in dessen `CLAUDE.md` — committet wird auf `main`, `stable` bekommt
   es nur per `scripts/release-stable.sh` und nur auf Ansage. Das Paket wird von der
   Feed-CI **nicht** gebaut (rust/host aus Quellen, ~35–45 GB) — lokal testen:
-  `RELEASES=snapshot ARCHS=x86_64 PACKAGES=heatingrod scripts/local-build.sh`.
+  im Feed-Checkout, `cd ~/projects/ddimension-openwrt-repo &&
+  RELEASES=snapshot ARCHS=x86_64 PACKAGES=heatingrod scripts/local-build.sh`.
