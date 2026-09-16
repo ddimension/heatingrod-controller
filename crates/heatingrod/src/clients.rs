@@ -100,8 +100,16 @@ pub fn compute_object_id(name: &str) -> String {
 /// frame — a peer that keeps pushing stale data but has stopped reading
 /// our frames would go unnoticed. The ping round-trip proves the peer
 /// still processes what we send, and measures the session RTT.
-const PING_INTERVAL: std::time::Duration = std::time::Duration::from_secs(15);
-const PONG_DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
+///
+/// Policy is aioesphomeapi parity (KEEP_ALIVE_FREQUENCY = 20s, timeout =
+/// interval × 4.5 = 90s): ESP8266 devices on weak WiFi answer pings with
+/// seconds of delay (measured 3-4s RTT, handshakes up to 28s) and a tight
+/// deadline forces reconnects right into the slow phase — every new
+/// handshake on the weak link can die mid-flight ("peer disconnected
+/// during handshake", Sep 2026 incident), while HA's established
+/// connection simply rides it out.
+const PING_INTERVAL: std::time::Duration = std::time::Duration::from_secs(20);
+const PONG_DEADLINE: std::time::Duration = std::time::Duration::from_secs(90);
 
 struct PingMonitor {
     interval: tokio::time::Interval,
@@ -311,12 +319,12 @@ impl KaskadeClient {
         let mut desired_poll = tokio::time::interval(tokio::time::Duration::from_millis(200));
         desired_poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut last_sent_seq: u64 = 0;
-        let mut watchdog = Box::pin(tokio::time::sleep(tokio::time::Duration::from_secs(60)));
+        let mut watchdog = Box::pin(tokio::time::sleep(tokio::time::Duration::from_secs(120)));
         let mut ping = PingMonitor::new();
         loop {
             tokio::select! {
                 _ = &mut watchdog => {
-                    tracing::warn!("kaskade: no traffic for 60s, forcing reconnect");
+                    tracing::warn!("kaskade: no traffic for 120s, forcing reconnect");
                     break;
                 }
                 _ = ping.interval.tick() => {
@@ -385,7 +393,7 @@ impl KaskadeClient {
                     }
                 }
                 msg = rx.recv() => {
-                    watchdog.as_mut().reset(tokio::time::Instant::now() + tokio::time::Duration::from_secs(60));
+                    watchdog.as_mut().reset(tokio::time::Instant::now() + tokio::time::Duration::from_secs(120));
                     match msg {
                     Ok(ProtoMessage::ListEntitiesSwitchResponse(s)) => {
                         // API >= 1.14: object_id may be omitted on the wire —
@@ -601,13 +609,13 @@ impl PowerloggerClient {
 
         // Idle watchdog: resets on EVERY received frame — a live session is
         // never torn down, a dead one is detected within 60s.
-        let mut watchdog = Box::pin(tokio::time::sleep(tokio::time::Duration::from_secs(60)));
+        let mut watchdog = Box::pin(tokio::time::sleep(tokio::time::Duration::from_secs(120)));
         let mut ping = PingMonitor::new();
         let mut prev_ts: Option<f64> = None;
         loop {
             tokio::select! {
                 _ = &mut watchdog => {
-                    tracing::warn!("powerlogger: no traffic for 60s, forcing reconnect");
+                    tracing::warn!("powerlogger: no traffic for 120s, forcing reconnect");
                     break;
                 }
                 _ = ping.interval.tick() => {
@@ -626,7 +634,7 @@ impl PowerloggerClient {
                     break;
                 }
                 msg = rx.recv() => {
-                    watchdog.as_mut().reset(tokio::time::Instant::now() + tokio::time::Duration::from_secs(60));
+                    watchdog.as_mut().reset(tokio::time::Instant::now() + tokio::time::Duration::from_secs(120));
                     match msg {
                     Ok(ProtoMessage::ListEntitiesSensorResponse(s)) => {
                         let oid = if s.object_id.is_empty() {
