@@ -1,6 +1,6 @@
 //! Handle to a live ESPHome API connection.
 
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 use crate::error::Error;
 use crate::parser::ProtoMessage;
@@ -41,7 +41,14 @@ use crate::parser::ProtoMessage;
 pub struct Connection {
     sender: mpsc::Sender<ProtoMessage>,
     receiver: broadcast::Receiver<ProtoMessage>,
-    done: oneshot::Receiver<Result<(), Error>>,
+    done: Option<oneshot::Receiver<Result<(), Error>>>,
+    /// Fired on [`Connection::close`] to stop the write loop and FIN the
+    /// socket. Without this, dropping the handle leaks the connection: the
+    /// read loop holds a sender clone, so the write loop never sees "all
+    /// senders dropped" and the TCP session stays ESTABLISHED until the
+    /// peer closes (which it never does — Sep 2026 slot-exhaustion
+    /// incident, MAX_API_CONNECTIONS=4 on the ESPs).
+    close_tx: Option<watch::Sender<bool>>,
 }
 
 impl Connection {
@@ -50,11 +57,13 @@ impl Connection {
         sender: mpsc::Sender<ProtoMessage>,
         receiver: broadcast::Receiver<ProtoMessage>,
         done: oneshot::Receiver<Result<(), Error>>,
+        close_tx: Option<watch::Sender<bool>>,
     ) -> Self {
         Self {
             sender,
             receiver,
-            done,
+            done: Some(done),
+            close_tx,
         }
     }
 
@@ -70,6 +79,15 @@ impl Connection {
         self.receiver.resubscribe()
     }
 
+    /// Ask the connection to shut down: the write loop exits and the
+    /// socket's write half is closed (FIN), which makes the peer close its
+    /// side and ends the read loop. Idempotent.
+    pub fn close(&self) {
+        if let Some(tx) = &self.close_tx {
+            let _ = tx.send(true);
+        }
+    }
+
     /// Wait for the connection to terminate and return its outcome.
     ///
     /// Returns `Ok(())` for a clean shutdown, `Err(Error::Disconnected(_))` when
@@ -78,7 +96,17 @@ impl Connection {
     /// task died (for example, panicked) without reporting an outcome.
     /// Consuming `self` here is deliberate: obtain a [`Connection::sender`]
     /// and [`Connection::receiver`] first if you need them for the session.
-    pub async fn wait(self) -> Result<(), Error> {
-        self.done.await.unwrap_or(Err(Error::TaskFailed))
+    pub async fn wait(mut self) -> Result<(), Error> {
+        self.done
+            .take()
+            .expect("wait called once")
+            .await
+            .unwrap_or(Err(Error::TaskFailed))
+    }
+}
+
+impl Drop for Connection {
+    fn drop(&mut self) {
+        self.close();
     }
 }

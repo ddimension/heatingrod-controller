@@ -70,6 +70,7 @@ use tokio::sync::Mutex;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+use tokio::sync::watch;
 use tokio_stream::StreamExt;
 use tokio_util::codec::FramedRead;
 use tokio_util::codec::FramedWrite;
@@ -611,7 +612,7 @@ impl EspHomeApi {
         debug!("Initialization done.");
 
         // Asynchronously wait for an inbound socket.
-        let (cancellation_write_tx, mut cancellation_write_rx) = oneshot::channel();
+        let (cancellation_write_tx, mut cancellation_write_rx) = watch::channel::<bool>(false);
 
         // Reports the read loop's terminal outcome to `Connection::wait`.
         let (done_tx, done_rx) = oneshot::channel::<Result<(), Error>>();
@@ -623,9 +624,13 @@ impl EspHomeApi {
                 // Wait for any new message
                 let answer_message = tokio::select! {
                     biased; // Poll cancellation_write_rx first
-                    cancel_message = &mut cancellation_write_rx => {
+                    cancel_message = cancellation_write_rx.changed() => {
                         match cancel_message {
-                            Ok(reason) => debug!("Write loop received cancellation signal ({reason}), exiting."),
+                            Ok(()) if !*cancellation_write_rx.borrow() => {
+                                // Sender dropped without signalling.
+                                continue;
+                            }
+                            Ok(()) => debug!("Write loop received cancellation signal, exiting."),
                             Err(_) => debug!("Write loop cancellation channel dropped, exiting."),
                         }
                         break;
@@ -686,17 +691,22 @@ impl EspHomeApi {
 
                 if matches!(answer_message, ProtoMessage::DisconnectResponse(_)) {
                     debug!("Disconnecting");
-                    let mut tcp_write = writer.into_inner();
-                    if let Err(err) = tcp_write.shutdown().await {
-                        error!("failed to shutdown socket: {:?}", err);
-                    }
                     break;
                 }
+            }
+            // Uniform teardown: dropping the tokio write half does NOT send
+            // a FIN (verified 2026-09-17 — the peer keeps the session
+            // ESTABLISHED forever, filling the ESPs' MAX_API_CONNECTIONS=4).
+            // An explicit shutdown() is required for every exit path.
+            let mut tcp_write = writer.into_inner();
+            if let Err(err) = tcp_write.shutdown().await {
+                error!("failed to shutdown socket: {:?}", err);
             }
         });
 
         // Clone all necessary data before spawning the task
         let answer_messages_tx_clone = answer_messages_tx.clone();
+        let cancellation_write_tx_read = cancellation_write_tx.clone();
         // Read Loop
         tokio::spawn(async move {
             let outcome: Result<(), Error> = async move {
@@ -800,7 +810,7 @@ impl EspHomeApi {
                 Err(e) => error!("Read loop stopped with error: {e}"),
             }
             // If sending fails, the write loop is probably already closed.
-            let _ = cancellation_write_tx.send("read loop finished");
+            let _ = cancellation_write_tx_read.send(true);
             // Report the terminal outcome to the consumer (ignored if dropped).
             let _ = done_tx.send(outcome);
         });
@@ -809,6 +819,7 @@ impl EspHomeApi {
             answer_messages_tx,
             outgoing_messages_rx,
             done_rx,
+            Some(cancellation_write_tx),
         ))
     }
 }

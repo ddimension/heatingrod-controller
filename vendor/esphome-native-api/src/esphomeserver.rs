@@ -235,7 +235,10 @@ impl EspHomeServer {
             let _ = done_tx.send(api_connection.wait().await);
         });
 
-        Ok(Connection::new(messages_tx, outgoing_messages_rx, done_rx))
+        // No close channel on the server path: when the peer (HA) goes
+        // away, the read loop ends and tears the session down on its own —
+        // the leak only exists on the initiator side.
+        Ok(Connection::new(messages_tx, outgoing_messages_rx, done_rx, None))
     }
 
     /// Adds an entity to the server's internal registry.

@@ -894,4 +894,66 @@ mod initiator_local_tests {
         eprintln!("initiator vs responder: CONNECT OK");
         drop(connection);
     }
+
+    /// Regression test for the Sep 2026 connection leak: dropping the
+    /// Connection handle must FIN the socket (via the close channel), so
+    /// the responder sees EOF and the read loop ends. Before the fix, the
+    /// write loop never exited (the read loop holds a sender clone) and
+    /// the session stayed ESTABLISHED forever — on the real ESPs this
+    /// filled MAX_API_CONNECTIONS=4 and caused handshake rejections.
+    #[tokio::test]
+    async fn dropping_connection_closes_socket() {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter("esphome_native_api=debug")
+            .try_init();
+        let port = 16667u16;
+        let mut scfg = ServerConfig {
+            name: "test-esp".into(),
+            friendly_name: "Test ESP".into(),
+            mac_address: "AA:BB:CC:DD:EE:02".into(),
+            bind_address: "127.0.0.1".into(),
+            port,
+            noise_psk: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=".into(),
+            ..Default::default()
+        };
+        scfg.normalize();
+        let (tx, _rx) = tokio::sync::mpsc::channel(16);
+        let (htx, _hrx) = tokio::sync::mpsc::channel(16);
+        let server = Arc::new(ApiServer::new(scfg, tx, htx));
+        let s = server.clone();
+        tokio::spawn(async move { let _ = s.run().await; });
+
+        let client = EspHomeClient::new(
+            "127.0.0.1",
+            port,
+            "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+            "initiator-test",
+        );
+        let mut attempts = 0;
+        let connection = loop {
+            match client.connect().await {
+                Ok(c) => break c,
+                Err(e) if attempts < 20 => {
+                    attempts += 1;
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    let _ = e;
+                }
+                Err(e) => panic!("connect failed: {e}"),
+            }
+        };
+        // close() fires the close channel → FIN → responder closes → the
+        // read loop reports its outcome. (Drop runs close() too; wait()
+        // consumes the handle, so exercise the explicit path here.)
+        connection.close();
+        let outcome = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            connection.wait(),
+        )
+        .await
+        .expect("connection did not close within 5s — socket leak");
+        assert!(
+            matches!(outcome, Ok(()) | Err(Error::Disconnected(_))),
+            "unexpected outcome: {outcome:?}"
+        );
+    }
 }
