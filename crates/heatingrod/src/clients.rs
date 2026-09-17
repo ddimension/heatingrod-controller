@@ -161,6 +161,11 @@ pub struct EspHomeClient {
     port: u16,
     noise_psk: String,
     name: String,
+    /// Last successfully used socket address — DNS fallback: the LAN
+    /// resolver drops DHCP-registered ESP names during device slow phases
+    /// (observed NXDOMAIN for esp-heizung-ksk on 2026-09-17 while the
+    /// device was pingable), so reconnects must not depend on the name.
+    last_addr: Arc<Mutex<Option<std::net::SocketAddr>>>,
 }
 
 impl EspHomeClient {
@@ -170,14 +175,40 @@ impl EspHomeClient {
             port,
             noise_psk: noise_psk.to_string(),
             name: name.to_string(),
+            last_addr: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Resolve the host, falling back to the cached address when the
+    /// resolver fails or returns nothing.
+    async fn resolve_target(&self) -> std::io::Result<std::net::SocketAddr> {
+        let resolve = tokio::net::lookup_host((self.host.as_str(), self.port)).await;
+        match resolve {
+            Ok(mut addrs) => {
+                if let Some(addr) = addrs.next() {
+                    return Ok(addr);
+                }
+            }
+            Err(e) => {
+                tracing::warn!("{}: DNS lookup failed: {e}", self.host);
+            }
+        }
+        if let Some(addr) = *self.last_addr.lock().expect("last_addr lock") {
+            tracing::warn!("{}: using cached address {addr}", self.host);
+            return Ok(addr);
+        }
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("{}: no address (DNS failed, no cached address)", self.host),
+        ))
     }
 
     /// Connect (initiator handshake) and send the HelloRequest.
     pub async fn connect(&self) -> Result<esphome_native_api::Connection, Error> {
-        let stream = TcpStream::connect((self.host.as_str(), self.port))
-            .await
-            .map_err(Error::Io)?;
+        let target = self.resolve_target().await.map_err(Error::Io)?;
+        let stream = TcpStream::connect(target).await.map_err(Error::Io)?;
+        // Only cache addresses that actually worked (connect succeeded).
+        *self.last_addr.lock().expect("last_addr lock") = Some(target);
         set_tcp_keepalive(&stream);
         let api = EspHomeApi::builder()
             .name(self.name.clone())
