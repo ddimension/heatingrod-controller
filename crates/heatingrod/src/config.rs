@@ -29,6 +29,7 @@ pub struct Config {
     pub ds100: Ds100Section,
     pub onewire: OnewireSection,
     pub canbus: CanbusSection,
+    pub sorel_limit: SorelLimitSection,
 }
 
 impl Config {
@@ -126,6 +127,9 @@ pub struct HaEntitiesSection {
     pub export_power_raw: String,
     pub balkonpv_power: String,
     pub heatingrod_switch: String,
+    /// SOREL duty-cycle limiter: enable switch + max pump runtime (min).
+    pub sorel_limit_enable: String,
+    pub sorel_limit_minutes: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -510,6 +514,47 @@ impl Default for CanbusSection {
             reconnect_delay: 5.0,
             unknown_buffer_size: 1000,
             sensor_names: BTreeMap::new(),
+        }
+    }
+}
+
+/// SOREL pump duty-cycle limiter (SCBI REMOTERELAY, rev7 §2.2.7).
+/// Runtime enable + duration come from HA entities; this section holds
+/// the static wiring (relay address, CAN IDs, timing).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct SorelLimitSection {
+    /// Static enable; the HA switch overrides at runtime (default off).
+    pub enabled: bool,
+    /// Max pump runtime per window (minutes, HA-adjustable).
+    pub max_on_minutes: u64,
+    /// Forced-off duration (minutes).
+    pub off_minutes: u64,
+    /// Pump relay index (0 = R1).
+    pub relay_index: u8,
+    /// Bitmask of relays used by the remote function.
+    pub relay_mask: u8,
+    /// Our CAN Subscriber ID (any unused 1..255).
+    pub our_can_id: u8,
+    /// Re-send interval while forcing off (the SOREL logic may re-enable
+    /// the relay in between).
+    pub tx_interval_secs: f64,
+    /// One-shot diagnostic: send one OFF, wait, one ON, then log — for
+    /// the supervised live test before enabling the limiter.
+    pub probe_once: bool,
+}
+
+impl Default for SorelLimitSection {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_on_minutes: 7,
+            off_minutes: 5,
+            relay_index: 0,
+            relay_mask: 0x01,
+            our_can_id: 0x20,
+            tx_interval_secs: 2.0,
+            probe_once: false,
         }
     }
 }

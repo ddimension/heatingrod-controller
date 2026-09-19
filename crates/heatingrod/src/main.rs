@@ -32,6 +32,7 @@ use controller::Controller;
 use hardware::{
     system_now, ControllerIo, Dac, DS100Poller, DS100Reading, LinuxI2cBus, LinuxSerialPort,
     MockDac, OneWirePoller, RealDac, SensorRole, SlcanTransport, SorelDecoder,
+    SorelRelayLimiter, RELAY_OFF, RELAY_ON, remoterelay_frame,
 };
 use hardware::slcan;
 
@@ -93,6 +94,31 @@ pub struct CanShared {
     pub connected: bool,
     pub packets: u64,
     pub errors: u64,
+    /// SOREL duty-cycle limiter telemetry for STATUS.
+    pub sorel_enabled: bool,
+    pub sorel_forcing: bool,
+    pub sorel_tx: u64,
+}
+
+impl Default for CanShared {
+    fn default() -> Self {
+        Self {
+            connected: false,
+            packets: 0,
+            errors: 0,
+            sorel_enabled: false,
+            sorel_forcing: false,
+            sorel_tx: 0,
+        }
+    }
+}
+
+/// SOREL limiter runtime settings — written by the controller thread from
+/// HA helper entities, read by the CAN thread.
+#[derive(Default)]
+pub struct SorelLimitShared {
+    pub enabled: bool,
+    pub max_on_secs: f64,
 }
 
 impl OwShared {
@@ -363,10 +389,12 @@ fn run_onewire_thread(
 }
 
 /// CAN bus thread: slcan over USBtin → SCBI decode → bridge dispatch.
+/// Also drives the SOREL pump duty-cycle limiter (REMOTERELAY TX).
 fn run_canbus_thread(
     config: Config,
     bridge: Arc<Mutex<Bridge>>,
     can: Arc<Mutex<CanShared>>,
+    sorel_limit: Arc<Mutex<SorelLimitShared>>,
     stop: Arc<AtomicBool>,
 ) {
     let mut decoder = SorelDecoder::new(config.canbus.unknown_buffer_size);
@@ -416,6 +444,16 @@ fn run_canbus_thread(
         );
         can.lock().expect("can lock").connected = true;
         let mut warn_count: u64 = 0;
+        let mut limiter = SorelRelayLimiter::new(
+            config.sorel_limit.max_on_minutes as f64 * 60.0,
+            config.sorel_limit.off_minutes as f64 * 60.0,
+            config.sorel_limit.relay_index,
+            config.sorel_limit.relay_mask,
+            config.sorel_limit.our_can_id,
+            0, // peer ID learned from live CONTROLLER frames
+            config.sorel_limit.tx_interval_secs,
+        );
+        let mut probe_done = false;
         while !stop.load(Ordering::Relaxed) {
             match transport.read_frame() {
                 Ok((can_id, data)) => {
@@ -433,9 +471,78 @@ fn run_canbus_thread(
                             alert.pump_pwm
                         );
                     }
-                    let mut sh = can.lock().expect("can lock");
-                    sh.packets = decoder.stats.total;
-                    sh.errors = decoder.stats.errors;
+                    // ---- SOREL duty-cycle limiter ----
+                    if let Some(peer) = decoder.peer_can_id {
+                        limiter.peer_can_id = peer;
+                    }
+                    // Feed the monitored relay's switched state.
+                    if let Some(relay_id) = msg.details.get("relay_id").and_then(|v| v.as_u64()) {
+                        let switched = msg
+                            .details
+                            .get("mode")
+                            .and_then(|v| v.as_str())
+                            .map(|m| m == "switched" || m == "phase")
+                            .unwrap_or(false);
+                        limiter.on_relay_state(
+                            system_now(),
+                            relay_id as u8,
+                            switched && msg.value.unwrap_or(0.0) != 0.0,
+                        );
+                    }
+                    // Runtime settings from HA (controller thread).
+                    {
+                        let sl = sorel_limit.lock().expect("sorel limit lock");
+                        limiter.set_enabled(sl.enabled);
+                        limiter.max_on_secs = sl.max_on_secs;
+                    }
+                    // One-shot diagnostic probe (supervised live test).
+                    if config.sorel_limit.probe_once
+                        && !probe_done
+                        && limiter.peer_can_id != 0
+                    {
+                        probe_done = true;
+                        tracing::info!(
+                            "sorel-limit PROBE: sending REMOTERELAY OFF→ON (relay {}, peer id {})",
+                            config.sorel_limit.relay_index,
+                            limiter.peer_can_id
+                        );
+                        let (id, data) = remoterelay_frame(
+                            config.sorel_limit.our_can_id,
+                            limiter.peer_can_id,
+                            config.sorel_limit.relay_index,
+                            RELAY_OFF,
+                            config.sorel_limit.relay_mask,
+                        );
+                        if let Err(e) = transport.write_frame(id, &data) {
+                            tracing::warn!("sorel-limit probe OFF failed: {e}");
+                        }
+                        sleep(3.0);
+                        let (id, data) = remoterelay_frame(
+                            config.sorel_limit.our_can_id,
+                            limiter.peer_can_id,
+                            config.sorel_limit.relay_index,
+                            RELAY_ON,
+                            config.sorel_limit.relay_mask,
+                        );
+                        if let Err(e) = transport.write_frame(id, &data) {
+                            tracing::warn!("sorel-limit probe ON failed: {e}");
+                        }
+                        tracing::info!("sorel-limit PROBE done — check the relay echo in the log");
+                    }
+                    let sent = limiter.tick(system_now(), |id, d| {
+                        if let Err(e) = transport.write_frame(id, d) {
+                            tracing::warn!("sorel-limit TX failed: {e}");
+                        }
+                    });
+                    {
+                        let mut sh = can.lock().expect("can lock");
+                        sh.packets = decoder.stats.total;
+                        sh.errors = decoder.stats.errors;
+                        sh.sorel_enabled = limiter.is_enabled();
+                        sh.sorel_forcing = limiter.is_forcing();
+                        sh.sorel_tx = limiter.tx_count;
+                    }
+                    let _ = sent;
                 }
                 Err(e) => {
                     // EOF / io errors mean the device is gone (USB unplug) —
@@ -483,6 +590,7 @@ struct ControllerParts {
     ds: Arc<Mutex<DsShared>>,
     ow: Arc<Mutex<OwShared>>,
     can: Arc<Mutex<CanShared>>,
+    sorel_limit: Arc<Mutex<SorelLimitShared>>,
     command_rx: Arc<Mutex<std::sync::mpsc::Receiver<Command>>>,
     state_file: PathBuf,
     ksk: Arc<Mutex<KaskadeShared>>,
@@ -750,12 +858,21 @@ fn run_controller_thread(parts: ControllerParts) {
                         sh.errs,
                     )
                 };
-                let (c_ok, c_pkts, c_errs) = {
+                let (c_ok, c_pkts, c_errs, srl) = {
                     let sh = parts.can.lock().expect("can lock");
                     (
                         if sh.connected { "ok" } else { "no" },
                         sh.packets,
                         sh.errors,
+                        format!(
+                            "{}{}",
+                            if sh.sorel_enabled { "on" } else { "off" },
+                            if sh.sorel_forcing {
+                                format!("!/tx{}", sh.sorel_tx)
+                            } else {
+                                String::new()
+                            }
+                        ),
                     )
                 };
                 let (w_total, w_errs, w_cyc, w_ms) = {
@@ -773,7 +890,7 @@ fn run_controller_thread(parts: ControllerParts) {
                     None => "?",
                 };
                 tracing::info!(
-                    "STATUS | {state_str} | grid={}W({grid_src}) pv={}W rod={}W/{}°C tank={}°C dac={:.1}V/{:.0}% delay={delay} | hapi={hapi} pl={pl_ok},msgs={pl_msgs},intv={pl_intv} ds100={ds_v}V,{ds_hz}Hz,mbus={ds_msgs},{ds_errs}e cbus={c_ok},pkts={c_pkts},errs={c_errs} 1wir={w_total}/{w_errs}e,cyc={w_cyc},{w_ms:.0}ms idac={idac} pc1={:.0}°C ksk={ksk}",
+                    "STATUS | {state_str} | grid={}W({grid_src}) pv={}W rod={}W/{}°C tank={}°C dac={:.1}V/{:.0}% delay={delay} | hapi={hapi} pl={pl_ok},msgs={pl_msgs},intv={pl_intv} ds100={ds_v}V,{ds_hz}Hz,mbus={ds_msgs},{ds_errs}e cbus={c_ok},pkts={c_pkts},errs={c_errs} 1wir={w_total}/{w_errs}e,cyc={w_cyc},{w_ms:.0}ms idac={idac} pc1={:.0}°C ksk={ksk} srl={srl}",
                     fmt(grid, 0),
                     fmt(pv, 0),
                     fmt(rod, 0),
@@ -857,6 +974,21 @@ fn run_controller_thread(parts: ControllerParts) {
             }
             if controller.calibrating {
                 continue;
+            }
+
+            // SOREL duty-cycle limiter: runtime settings from HA helpers.
+            // Absent values keep the previous state (HA-outage philosophy,
+            // same as the manual switch).
+            {
+                let mut sl = parts.sorel_limit.lock().expect("sorel limit lock");
+                if let Some(v) = io.ha_state(&cfg.ha_entities.sorel_limit_enable, 300.0) {
+                    sl.enabled = v == "on";
+                }
+                if let Some(min) = io.ha_numeric(&cfg.ha_entities.sorel_limit_minutes, 300.0)
+                    && (1.0..=120.0).contains(&min)
+                {
+                    sl.max_on_secs = min * 60.0;
+                }
             }
 
             // Full controller push (30s, Python watchdog `_update_esphome_sensors`)
@@ -1210,6 +1342,13 @@ async fn main() -> ExitCode {
         connected: false,
         packets: 0,
         errors: 0,
+        sorel_enabled: config.sorel_limit.enabled,
+        sorel_forcing: false,
+        sorel_tx: 0,
+    }));
+    let sorel_limit = Arc::new(Mutex::new(SorelLimitShared {
+        enabled: config.sorel_limit.enabled,
+        max_on_secs: config.sorel_limit.max_on_minutes as f64 * 60.0,
     }));
     let ksk = Arc::new(Mutex::new(KaskadeShared::default()));
 
@@ -1225,6 +1364,7 @@ async fn main() -> ExitCode {
         ds: ds.clone(),
         ow: ow.clone(),
         can: can.clone(),
+        sorel_limit: sorel_limit.clone(),
         command_rx: Arc::new(Mutex::new(cmd_rx)),
         state_file: state_file.clone(),
         ksk: ksk.clone(),
@@ -1297,8 +1437,9 @@ async fn main() -> ExitCode {
                 let cfg = config.clone();
                 let bridge = bridge.clone();
                 let can = can.clone();
+                let sorel_limit = sorel_limit.clone();
                 let stop = stop.clone();
-                move || run_canbus_thread(cfg, bridge, can, stop)
+                move || run_canbus_thread(cfg, bridge, can, sorel_limit, stop)
             })
             .expect("spawn canbus thread");
     }

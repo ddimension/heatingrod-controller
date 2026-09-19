@@ -186,6 +186,26 @@ impl SlcanTransport {
         self.port.is_some()
     }
 
+    /// Send one CAN frame (29-bit extended ID, slcan `T` command).
+    /// Returns an error when the port is closed or the write fails.
+    pub fn write_frame(&mut self, can_id: u32, data: &[u8]) -> Result<(), String> {
+        use std::io::Write;
+        let Some(port) = self.port.as_mut() else {
+            return Err("slcan: port not open".to_string());
+        };
+        if data.len() > 8 {
+            return Err(format!("slcan: frame data too long: {}", data.len()));
+        }
+        let mut cmd = format!("T{can_id:08X}{:X}", data.len());
+        for b in data {
+            cmd.push_str(&format!("{b:02X}"));
+        }
+        cmd.push('\r');
+        port.write_all(cmd.as_bytes())
+            .map_err(|e| format!("slcan write frame {cmd:?}: {e}"))?;
+        Ok(())
+    }
+
     /// Read one CAN frame (blocking, ~1s timeout).
     pub fn read_frame(&mut self) -> Result<(u32, Vec<u8>), String> {
         use std::io::Read;

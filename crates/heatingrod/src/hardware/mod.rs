@@ -13,7 +13,10 @@ pub mod onewire;
 pub mod slcan;
 pub mod traits;
 
-pub use canbus::{AirInPipeDetector, DecodedMessage, ScbiId, SorelDecoder, Stats};
+pub use canbus::{
+    AirInPipeDetector, DecodedMessage, ScbiId, SorelDecoder, SorelRelayLimiter, Stats,
+    RELAY_OFF, RELAY_ON, remoterelay_frame,
+};
 pub use dac::{I2cBus, LinuxI2cBus, MockI2cBus, RealDac};
 pub use ds100::{
     baud_to_index, crc16, index_to_baud, DS100DeviceInfo, DS100Poller, DS100Reading,

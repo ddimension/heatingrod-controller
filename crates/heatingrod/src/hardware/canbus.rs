@@ -394,6 +394,9 @@ pub struct SorelDecoder {
     unknown_buffer: usize,
     unknown_messages: VecDeque<DecodedMessage>,
     seen_unknown: std::collections::HashSet<(u8, u8)>,
+    /// CAN Subscriber ID of the SOREL controller — the `client` byte of
+    /// CONTROLLER frames (REMOTERELAY addresses the receiver with it).
+    pub peer_can_id: Option<u8>,
 }
 
 #[derive(Debug, Default)]
@@ -425,12 +428,17 @@ impl SorelDecoder {
             unknown_buffer: unknown_buffer_size,
             unknown_messages: VecDeque::new(),
             seen_unknown: std::collections::HashSet::new(),
+            peer_can_id: None,
         }
     }
 
     pub fn decode(&mut self, can_id: u32, data: &[u8], timestamp: f64) -> DecodedMessage {
         self.stats.total += 1;
         let scbi_id = ScbiId::from_can_id(can_id);
+        if scbi_id.prog == ScbiProg::Controller as u8 {
+            // The sender's subscriber ID is the SOREL's CAN ID.
+            self.peer_can_id = Some(scbi_id.client);
+        }
         let mut msg = DecodedMessage::new(timestamp, scbi_id, data);
 
         if msg.scbi_id.msg == ScbiMsg::Error as u8 {
@@ -792,6 +800,153 @@ fn hex_of(data: &[u8]) -> String {
     data.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+// ---- SOREL relay duty-cycle limiter (SCBI rev7 §2.2.7 REMOTERELAY) ----
+
+/// Remote relay states (SCBI rev7: 0 = RELAIS_OFF, 255 = RELAIS_ON).
+pub const RELAY_OFF: u8 = 0;
+pub const RELAY_ON: u8 = 255;
+
+/// Build a REMOTERELAY request frame: "Set relay of another controller".
+/// Address ID: REMOTERELAY(0x88).our_subscriber.peer_subscriber.MSG_REQUEST,
+/// payload [relay_index, state, relay_mask].
+pub fn remoterelay_frame(
+    our_id: u8,
+    peer_id: u8,
+    relay_index: u8,
+    state: u8,
+    relay_mask: u8,
+) -> (u32, Vec<u8>) {
+    let can_id = 0x88 | ((our_id as u32) << 8) | ((peer_id as u32) << 16);
+    (can_id, vec![relay_index, state, relay_mask])
+}
+
+/// Duty-cycle limiter for the SOREL warm-water pump: the pump may run at
+/// most `max_on_secs` per window; after that it is forced off via
+/// REMOTERELAY frames (repeated every `tx_interval` — the SOREL's own
+/// logic may re-enable the relay in between) for `off_secs`, then the
+/// SOREL logic continues normally. Never sends when disabled.
+pub struct SorelRelayLimiter {
+    pub max_on_secs: f64,
+    pub off_secs: f64,
+    pub relay_index: u8,
+    pub relay_mask: u8,
+    pub our_can_id: u8,
+    pub peer_can_id: u8,
+    pub tx_interval_secs: f64,
+    enabled: bool,
+    pump_on_since: Option<f64>,
+    off_until: Option<f64>,
+    last_tx: f64,
+    pub tx_count: u64,
+}
+
+impl SorelRelayLimiter {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        max_on_secs: f64,
+        off_secs: f64,
+        relay_index: u8,
+        relay_mask: u8,
+        our_can_id: u8,
+        peer_can_id: u8,
+        tx_interval_secs: f64,
+    ) -> Self {
+        Self {
+            max_on_secs,
+            off_secs,
+            relay_index,
+            relay_mask,
+            our_can_id,
+            peer_can_id,
+            tx_interval_secs,
+            enabled: false,
+            pump_on_since: None,
+            off_until: None,
+            last_tx: f64::NEG_INFINITY,
+            tx_count: 0,
+        }
+    }
+
+    /// Runtime enable/disable (HA switch). Disabling aborts an active
+    /// off-window immediately — no more frames are sent.
+    pub fn set_enabled(&mut self, on: bool) {
+        if !on && self.enabled {
+            self.off_until = None;
+            self.pump_on_since = None;
+        }
+        self.enabled = on;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// True while an off-window is active (REMOTERELAY frames in flight).
+    pub fn is_forcing(&self) -> bool {
+        self.off_until.is_some()
+    }
+
+    /// Feed the decoded switched state of the monitored relay.
+    pub fn on_relay_state(&mut self, now: f64, relay_id: u8, switched_on: bool) {
+        if relay_id != self.relay_index {
+            return;
+        }
+        if switched_on && self.pump_on_since.is_none() {
+            self.pump_on_since = Some(now);
+        }
+        if !switched_on {
+            self.pump_on_since = None;
+        }
+    }
+
+    /// Drive the state machine; sends forced-off frames through `tx`.
+    /// Returns the number of frames sent.
+    pub fn tick(&mut self, now: f64, mut tx: impl FnMut(u32, &[u8])) -> usize {
+        let mut sent = 0;
+        if !self.enabled {
+            return sent;
+        }
+        // Start the off-window once the pump ran for the full allowance.
+        if self.off_until.is_none()
+            && let Some(since) = self.pump_on_since
+            && now - since >= self.max_on_secs
+        {
+            tracing::info!(
+                "sorel-limit: pump ran {:.0}s ≥ {:.0}s — forcing off for {:.0}s",
+                now - since,
+                self.max_on_secs,
+                self.off_secs
+            );
+            self.off_until = Some(now + self.off_secs);
+        }
+        if let Some(until) = self.off_until {
+            if now >= until {
+                tracing::info!("sorel-limit: off-window over, releasing relay to SOREL logic");
+                self.off_until = None;
+                self.pump_on_since = None; // fresh window on next on-transition
+            } else if now - self.last_tx >= self.tx_interval_secs {
+                let (id, data) = remoterelay_frame(
+                    self.our_can_id,
+                    self.peer_can_id,
+                    self.relay_index,
+                    RELAY_OFF,
+                    self.relay_mask,
+                );
+                tracing::info!(
+                    "sorel-limit: REMOTERELAY off relay={} id={id:08X} data={}",
+                    self.relay_index,
+                    hex_of(&data)
+                );
+                tx(id, &data);
+                self.last_tx = now;
+                self.tx_count += 1;
+                sent += 1;
+            }
+        }
+        sent
+    }
+}
+
 // ---- tests (ports of test_canbus.py) ----
 
 #[cfg(test)]
@@ -1092,5 +1247,76 @@ mod tests {
     #[test]
     fn hc_state4_byte2temp_full_u16() {
         assert_eq!(byte2temp_u16(0x012C), 117.0);
+    }
+
+    // ---- SOREL relay limiter ----
+
+    #[test]
+    fn remoterelay_frame_layout() {
+        // SCBI rev7 §2.2.7: REMOTERELAY.SubscriberID.ReceiverID.MSG_REQUEST
+        let (id, data) = remoterelay_frame(0x20, 0x05, 1, RELAY_OFF, 0x01);
+        assert_eq!(id, 0x00052088);
+        assert_eq!(data, vec![1, 0, 0x01]);
+    }
+
+    fn limiter() -> SorelRelayLimiter {
+        let mut l = SorelRelayLimiter::new(420.0, 300.0, 0, 0x01, 0x20, 0x05, 2.0);
+        l.set_enabled(true);
+        l
+    }
+
+    #[test]
+    fn limiter_sends_off_after_max_on() {
+        let mut l = limiter();
+        let mut frames = Vec::new();
+        l.on_relay_state(100.0, 0, true); // pump on at t=100
+        assert_eq!(l.tick(100.0, |id, d| frames.push((id, d.to_vec()))), 0);
+        // 420s later: off-window starts, first frame goes out
+        assert_eq!(l.tick(520.0, |id, d| frames.push((id, d.to_vec()))), 1);
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].1, vec![0, RELAY_OFF, 0x01]);
+        // tx_interval throttles repeats
+        assert_eq!(l.tick(521.0, |id, d| frames.push((id, d.to_vec()))), 0);
+        assert_eq!(l.tick(522.0, |id, d| frames.push((id, d.to_vec()))), 1);
+        assert_eq!(frames.len(), 2);
+    }
+
+    #[test]
+    fn limiter_releases_after_off_window() {
+        let mut l = limiter();
+        l.on_relay_state(0.0, 0, true);
+        l.tick(430.0, |_, _| {}); // window starts
+        l.tick(431.0, |_, _| {}); // one frame
+        assert_eq!(l.tick(750.0, |_, _| {}), 0); // window over (430+300=730)
+        // no more frames even though the pump is still "on"
+        assert_eq!(l.tick(760.0, |_, _| {}), 0);
+    }
+
+    #[test]
+    fn limiter_disabled_never_sends_and_aborts_window() {
+        let mut l = limiter();
+        l.on_relay_state(0.0, 0, true);
+        l.tick(500.0, |_, _| {}); // window active
+        l.set_enabled(false);
+        assert_eq!(l.tick(501.0, |_, _| {}), 0);
+        // re-enable: pump_on_since was reset, so no immediate window
+        l.set_enabled(true);
+        assert_eq!(l.tick(502.0, |_, _| {}), 0);
+    }
+
+    #[test]
+    fn limiter_ignores_other_relays() {
+        let mut l = limiter();
+        l.on_relay_state(0.0, 2, true); // wrong relay
+        assert_eq!(l.tick(500.0, |_, _| {}), 0);
+    }
+
+    #[test]
+    fn decoder_tracks_peer_can_id() {
+        let mut d = SorelDecoder::new(10);
+        // CONTROLLER.I_AM_HERE frame: prog=0x0B, client=0x05
+        let can_id = 0x0B | (0x05u32 << 8) | (0x01u32 << 16);
+        d.decode(can_id, &[0x05, 1, 2, 3], 0.0);
+        assert_eq!(d.peer_can_id, Some(0x05));
     }
 }

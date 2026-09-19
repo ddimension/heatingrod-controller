@@ -27,6 +27,8 @@ ha_entities:
   export_power_raw: sensor.export_power_raw
   balkonpv_power: sensor.balkonpv_total_ac_output_power_active
   heatingrod_switch: input_boolean.heizstab_schalter
+  sorel_limit_enable: input_boolean.heizung_sorel_limit
+  sorel_limit_minutes: input_number.heizung_sorel_limit_minuten
 control:
   mode: calibration
   step_interval: 0.1
@@ -661,3 +663,13 @@ canbus:
     1: Zirkulation
     6: Warmwasser
     7: Durchfluss_VFS
+
+sorel_limit:
+  enabled: false
+  max_on_minutes: 7
+  off_minutes: 5
+  relay_index: 0
+  relay_mask: 1
+  our_can_id: 32
+  tx_interval_secs: 2.0
+  probe_once: false
