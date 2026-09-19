@@ -513,8 +513,11 @@ fn run_canbus_thread(
                             RELAY_OFF,
                             config.sorel_limit.relay_mask,
                         );
-                        if let Err(e) = transport.write_frame(id, &data) {
-                            tracing::warn!("sorel-limit probe OFF failed: {e}");
+                        match transport.write_frame_checked(id, &data) {
+                            Ok(ack) => tracing::info!(
+                                "sorel-limit PROBE: OFF ack={ack:?}",
+                            ),
+                            Err(e) => tracing::warn!("sorel-limit probe OFF failed: {e}"),
                         }
                         sleep(3.0);
                         let (id, data) = remoterelay_frame(
@@ -524,8 +527,32 @@ fn run_canbus_thread(
                             RELAY_ON,
                             config.sorel_limit.relay_mask,
                         );
-                        if let Err(e) = transport.write_frame(id, &data) {
-                            tracing::warn!("sorel-limit probe ON failed: {e}");
+                        match transport.write_frame_checked(id, &data) {
+                            Ok(ack) => tracing::info!(
+                                "sorel-limit PROBE: ON ack={ack:?}",
+                            ),
+                            Err(e) => tracing::warn!("sorel-limit probe ON failed: {e}"),
+                        }
+                        // REMOTESENSOR read request (SCBI rev7 §2.2.5): a
+                        // documented request-response channel. Two addressings:
+                        // client=our_id (documented "sender" byte) and
+                        // client=peer_id (discriminator for a hardware
+                        // acceptance filter on the client byte).
+                        for client in [
+                            config.sorel_limit.our_can_id as u32,
+                            limiter.peer_can_id as u32,
+                        ] {
+                            let req_id = 0x83 | (client << 8) | ((limiter.peer_can_id as u32) << 16);
+                            tracing::info!(
+                                "sorel-limit PROBE: REMOTESENSOR func=8 client={client:#x}"
+                            );
+                            match transport.write_frame_checked(req_id | (8 << 16), &[]) {
+                                Ok(ack) => tracing::info!(
+                                    "sorel-limit PROBE: REMOTESENSOR ack={ack:?}"
+                                ),
+                                Err(e) => tracing::warn!("sorel-limit probe remotesensor failed: {e}"),
+                            }
+                            sleep(3.0);
                         }
                         tracing::info!("sorel-limit PROBE done — check the relay echo in the log");
                     }

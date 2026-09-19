@@ -201,9 +201,28 @@ impl SlcanTransport {
             cmd.push_str(&format!("{b:02X}"));
         }
         cmd.push('\r');
+        tracing::debug!("CAN TX: {cmd}");
         port.write_all(cmd.as_bytes())
             .map_err(|e| format!("slcan write frame {cmd:?}: {e}"))?;
         Ok(())
+    }
+
+    /// Write a frame and read the adapter's immediate ack byte:
+    /// '\\r' = accepted, '\\a' (BEL) = NAK (e.g. 29-bit TX unsupported),
+    /// anything else = we consumed a byte of an incoming frame (desync!).
+    /// Diagnostic only — used by the supervised one-shot probe.
+    pub fn write_frame_checked(&mut self, can_id: u32, data: &[u8]) -> Result<char, String> {
+        self.write_frame(can_id, data)?;
+        use std::io::Read;
+        let Some(port) = self.port.as_mut() else {
+            return Err("slcan: port not open".to_string());
+        };
+        let mut ack = [0u8; 1];
+        match port.read(&mut ack) {
+            Ok(1) => Ok(ack[0] as char),
+            Ok(_) => Err("slcan: no ack byte".to_string()),
+            Err(e) => Err(format!("slcan: ack read: {e}")),
+        }
     }
 
     /// Read one CAN frame (blocking, ~1s timeout).

@@ -435,10 +435,13 @@ impl SorelDecoder {
     pub fn decode(&mut self, can_id: u32, data: &[u8], timestamp: f64) -> DecodedMessage {
         self.stats.total += 1;
         let scbi_id = ScbiId::from_can_id(can_id);
-        if scbi_id.prog == ScbiProg::Controller as u8 {
-            // The sender's subscriber ID is the SOREL's CAN ID.
-            self.peer_can_id = Some(scbi_id.client);
-        }
+        // The `client` byte is the SENDER's subscriber ID — the SOREL's CAN
+        // ID. The MTDC sends no CONTROLLER frames (I_AM_HERE), so learn it
+        // from any frame on the bus (the SOREL is the only other node).
+        self.peer_can_id = Some(scbi_id.client);
+        // Raw frame log for protocol work (--log-module canbus): every
+        // frame on the bus, dedup not applied at debug level.
+        tracing::debug!("CAN RX: {can_id:08X} [{}] {}", data.len(), hex_of(data));
         let mut msg = DecodedMessage::new(timestamp, scbi_id, data);
 
         if msg.scbi_id.msg == ScbiMsg::Error as u8 {
@@ -1314,9 +1317,10 @@ mod tests {
     #[test]
     fn decoder_tracks_peer_can_id() {
         let mut d = SorelDecoder::new(10);
-        // CONTROLLER.I_AM_HERE frame: prog=0x0B, client=0x05
-        let can_id = 0x0B | (0x05u32 << 8) | (0x01u32 << 16);
-        d.decode(can_id, &[0x05, 1, 2, 3], 0.0);
+        // Any frame carries the sender's subscriber ID in the client byte
+        // (the MTDC sends no CONTROLLER frames).
+        let can_id = 0x80 | (0x05u32 << 8) | (0x02u32 << 16); // DATALOGGER.RELAY
+        d.decode(can_id, &[0, 0, 0], 0.0);
         assert_eq!(d.peer_can_id, Some(0x05));
     }
 }
