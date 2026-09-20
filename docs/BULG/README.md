@@ -41,3 +41,15 @@ BAfA-Listeneintrag prüfen, Garantie-Abwicklung in DE bestätigen.
 - Regelstrategie: PV-Überschuss → WP an + Heizsollwert/Modus setzen;
   Status-/Bedarf-Bits + Temperaturen als Sensoren in HA (ESPHome-Sub-Device)
 - SG-Signal (0x0003 Bit 7) für die Scheduler-Rückmeldung
+
+## Varianten (EPREL-Fiches)
+
+| Modell | ηs NT / MT | Pdesign NT | Schall außen |
+|---|---|---|---|
+| BULG Mono Pro 12 KW (EPREL 2576278) | **195 % / 147 %**, A+++/A++ | 9 kW | 58 dB |
+| BULG Mono Pro 15,2 KW (EPREL 2592867) | 190 % / 146 %, A+++/A++ | 13 kW | 60 dB |
+
+Die 12-kW-Variante ist im NT-Zielbetrieb minimal effizienter und leiser;
+die 15,2-kW-Variante hat mehr Leistungsreserve (13 kW Pdesign). Phase
+(1~ vs 3~) geht aus den Fiches nicht hervor — Installationshandbuch oder
+Hersteller fragen.
