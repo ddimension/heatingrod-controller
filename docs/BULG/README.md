@@ -71,3 +71,21 @@ OFFEN bei BULG: Wohin wird im manuellen Frequenzmodus der Frequenz-Sollwert
 geschrieben? (kein RW-Hz-Register in der PDF dokumentiert). Falls
 beantwortet → direkte grobe Leistungssteuerung möglich (30–100 %,
 Minuten-Takt); Heizstab bleibt Feinregler.
+
+## Nachtrag 2 (20.09.2026): Handbuch-Funde (Bulg_Mono_Pro2.pdf)
+
+- **Phase: 3~ (AC380-420V/3N~/50Hz)** — Verdrahtungsplan + Phasenfolge-
+  Überwachung (Fehler: Phasenfolge, Phasenspannung, verlorene Phase) →
+  die Mono Pro 12/15,2 kW sind dreiphasig. Frage 1 GELÖST.
+- **SG-Signal**: CN18 „SG signal" auf der Platine — SG-Ready-Hardware
+  bestätigt (auch SG-Ready-Datenbank Modell 5970, Label bis 31.12.2026).
+- **Sterilisationsmodus (Antilegionellen)**: im Menü aktivierbar, mit
+  einstellbarer Sterilisationstemperatur + Wochenplan (Temp. Sollwert,
+  Wochentag, Timer). Exakte Max-Temperatur nicht im Text — Anbieter fragen.
+- **Garantie-Bedingungen (Full-Service-Erweiterung)**: erfordert u. a.
+  Pufferspeicher ~20 l/kW (15 kW → ~300 l — unser 800-l-Puffer erfüllt
+  das weit), Magnetit-/Schlammabscheider im Rücklauf, Luftblasenabscheider
+  im Vorlauf, Frostschutzventile, Außenleitungsdämmung ≥200 %,
+  Installation durch Meisterbetrieb. Für die Garantie relevant!
+- Manueller Frequenzmodus: im Handbuch nicht dokumentiert — Frage bleibt
+  beim Anbieter (Modbus 0x0032 Bit 2 ohne Zielregister).
