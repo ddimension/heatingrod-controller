@@ -53,3 +53,21 @@ Die 12-kW-Variante ist im NT-Zielbetrieb minimal effizienter und leiser;
 die 15,2-kW-Variante hat mehr Leistungsreserve (13 kW Pdesign). Phase
 (1~ vs 3~) geht aus den Fiches nicht hervor — Installationshandbuch oder
 Hersteller fragen.
+
+## Nachtrag (20.09.2026): Leistungs-/Frequenz-Register
+
+| Adresse | R/W | Bedeutung |
+|---|---|---|
+| 0x0017 | R | Elektrische Leistungsaufnahme (W) |
+| 0x0019 | R | Heiz-/Kühlleistung (W) |
+| 0x001A | R | Wechselstrom (A) |
+| 0x0018 | R | Pumpenwasserdurchfluss (m³/h) |
+| 0x001E | R | Aktuelle Kompressorfrequenz |
+| 0x0024 | R | Zielfrequenz (intern) |
+| 0x0025 | R | Smart-Grid-Status |
+| 0x0032 Bit 2 | RW | **Manuelle Frequenzauswahl** (Modus-Bit) |
+
+OFFEN bei BULG: Wohin wird im manuellen Frequenzmodus der Frequenz-Sollwert
+geschrieben? (kein RW-Hz-Register in der PDF dokumentiert). Falls
+beantwortet → direkte grobe Leistungssteuerung möglich (30–100 %,
+Minuten-Takt); Heizstab bleibt Feinregler.
