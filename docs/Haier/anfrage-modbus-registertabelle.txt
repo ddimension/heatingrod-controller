@@ -1,0 +1,37 @@
+Von: André Valentin <avalentin@marcant.net>
+An: info.de@haier-europe.com
+Betreff: Anfrage: Modbus-RTU-Registertabelle für AW122MXGHA (R290 Monobloc) mit ATW-A03N
+Datum: Sun, 20 Sep 2026 11:47:52 +0200
+
+Sehr geehrte Damen und Herren,
+
+wir realisieren PV-überschussgeführte Heizsysteme (u. a. Projekte mit
+800-l-Pufferspeichern, Öl-Brennwertkesseln und 7,5-kW-Heizstab-Regelung
+über eine eigene Steuerung auf Raspberry-Pi-Basis mit Home Assistant).
+In einem laufenden Projekt integrieren wir Ihre Luft-Wasser-Wärmepumpe
+des Typs AW122MXGHA (R290-Monobloc, 12 kW, 3-phasig) mit Steuerbox
+ATW-A03N als dritten Wärmeerzeuger parallel zum bestehenden Kessel.
+Ziel: PV-überschussgeführte Pufferladung mit niedrigen Vorlauftemperaturen
+und smart-grid-fähiger Betriebsführung über unsere eigene Regelung.
+
+Für die Anbindung über Modbus RTU (RS485, 9600 Baud, 8N1) benötigen wir
+die vollständige Protokoll-/Registerdokumentation für dieses Gerät:
+
+  - Leseregister: Betriebszustand, Vor-/Rücklauftemperatur, elektrische
+    Leistung/Strom, Sollwerte, Fehlercodes, Status der Smart-Grid-Eingänge
+  - Schreibregister: ON/OFF, Betriebsart (Heizen/Kühlen), Solltemperatur,
+    ggf. Smart-Grid-/Bivalenz-Zustände
+  - Hinweise zur Aktivierung der Modbus-Schnittstelle an der ATW-A03N
+    (Anschlüsse B2/A2 bzw. CN2, etwaige DIP-Schalter) und zu möglichen
+    Konflikten mit dem kabelgebundenen Regler
+  - Angaben zu Skalierungsfaktoren und Datenformaten der Register
+
+Wir wären Ihnen dankbar, wenn Sie uns das entsprechende Dokument
+(Modbus-RTU-Kommunikationsprotokoll / Registertabelle) zusenden könnten.
+Für technische Rückfragen stehe ich gern zur Verfügung.
+
+Mit freundlichen Grüßen
+
+André Valentin
+MarcanT – Solar- & Heizungstechnik
+E-Mail: avalentin@marcant.net
