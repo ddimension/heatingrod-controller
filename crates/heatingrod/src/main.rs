@@ -1096,6 +1096,12 @@ fn run_controller_thread(parts: ControllerParts) {
     tracing::info!("Controller stopped");
 }
 
+/// A client session that stayed up at least this long counts as stable: the
+/// next unexpected drop restarts the reconnect backoff at its first step
+/// (aioesphomeapi resets its backoff the same way). Without this, the
+/// backoff grows with every drop over the whole process lifetime.
+const STABLE_SESSION_MIN: std::time::Duration = std::time::Duration::from_secs(60);
+
 // ---- async tasks ----
 
 async fn powerlogger_task(
@@ -1113,13 +1119,21 @@ async fn powerlogger_task(
     client.set_shared(pl);
     let mut tries: u32 = 0;
     while !stop.load(Ordering::Relaxed) {
+        let session_start = std::time::Instant::now();
         client.run_session().await;
         if stop.load(Ordering::Relaxed) {
             break;
         }
         // aioesphomeapi ReconnectLogic: exponential backoff ~1.8^tries,
-        // capped at 60s — a dead ESP is not hammered 12×/minute.
-        tries += 1;
+        // capped at 60s — a dead ESP is not hammered 12×/minute. A session
+        // that stayed up a while proves the ESP healthy: restart at the
+        // next drop instead of accumulating process-lifetime penalty
+        // (observed 21.09.2026: 6th drop of the process → 171s gap).
+        tries = if session_start.elapsed() >= STABLE_SESSION_MIN {
+            0
+        } else {
+            tries + 1
+        };
         let delay = client.reconnect_delay * 1.8f64.powi(tries as i32).min(60.0);
         tokio::time::sleep(Duration::from_secs_f64(delay)).await;
     }
@@ -1142,11 +1156,14 @@ async fn kaskade_task(
     // restarts) must not be hammered every 5s — 30s gives it room to recover.
     let mut backoff = 5.0_f64;
     while !stop.load(Ordering::Relaxed) {
+        let session_start = std::time::Instant::now();
         client.run_session().await;
         if stop.load(Ordering::Relaxed) {
             break;
         }
-        if client.connected {
+        // Reset the backoff when the session survived a while — a stable
+        // ESP dropping once must not pay the growth of earlier drops.
+        if session_start.elapsed() >= STABLE_SESSION_MIN {
             backoff = 5.0;
         }
         tokio::time::sleep(Duration::from_secs_f64(backoff)).await;
