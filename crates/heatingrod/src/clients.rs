@@ -155,6 +155,15 @@ impl PingMonitor {
     }
 }
 
+/// A broadcast `Lagged` error means the peer flushed a burst faster than we
+/// drained it (ESP stall-flush: 40-60 frames in ~1ms, Sep 2026 incident) —
+/// the session is healthy; the receiver resyncs and the next message is
+/// fresh. Only `Closed` (all senders gone, i.e. the read task ended) ends
+/// the session.
+fn rx_err_fatal(e: &tokio::sync::broadcast::error::RecvError) -> bool {
+    matches!(e, tokio::sync::broadcast::error::RecvError::Closed)
+}
+
 /// Generic ESPHome API client connection (initiator mode + Hello).
 pub struct EspHomeClient {
     host: String,
@@ -350,6 +359,7 @@ impl KaskadeClient {
         let mut desired_poll = tokio::time::interval(tokio::time::Duration::from_millis(200));
         desired_poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut last_sent_seq: u64 = 0;
+        let mut lag_warned = false;
         let mut watchdog = Box::pin(tokio::time::sleep(tokio::time::Duration::from_secs(120)));
         let mut ping = PingMonitor::new();
         loop {
@@ -532,7 +542,15 @@ impl KaskadeClient {
                         let d: String = d.chars().take(80).collect();
                         tracing::debug!("kaskade: unhandled {d}");
                     }
-                    Err(_) => break,
+                    Err(e) => {
+                        if rx_err_fatal(&e) {
+                            break;
+                        }
+                        if !lag_warned {
+                            lag_warned = true;
+                            tracing::warn!("kaskade: message lag, {e} — continuing");
+                        }
+                    }
                 }
                 }
             }
@@ -642,6 +660,7 @@ impl PowerloggerClient {
         // never torn down, a dead one is detected within 60s.
         let mut watchdog = Box::pin(tokio::time::sleep(tokio::time::Duration::from_secs(120)));
         let mut ping = PingMonitor::new();
+        let mut lag_warned = false;
         let mut prev_ts: Option<f64> = None;
         loop {
             tokio::select! {
@@ -757,7 +776,15 @@ impl PowerloggerClient {
                             .await;
                     }
                     Ok(_) => {}
-                    Err(_) => break,
+                    Err(e) => {
+                        if rx_err_fatal(&e) {
+                            break;
+                        }
+                        if !lag_warned {
+                            lag_warned = true;
+                            tracing::warn!("powerlogger: message lag, {e} — continuing");
+                        }
+                    }
                 }
                 }
             }
@@ -773,6 +800,17 @@ impl PowerloggerClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Lagged must NOT end a session (ESP stall-flush bursts, Sep 2026);
+    /// Closed must.
+    #[test]
+    fn rx_lag_is_not_fatal_closed_is() {
+        use tokio::sync::broadcast;
+        assert!(!rx_err_fatal(&broadcast::error::RecvError::Lagged(23)));
+        let (tx, mut rx) = broadcast::channel::<u32>(2);
+        drop(tx);
+        assert!(rx_err_fatal(&rx.blocking_recv().unwrap_err()));
+    }
 
     /// Manual check against the REAL kaskade ESP — READ-ONLY: hello, list
     /// entities, subscribe, track the actual switch state. Never sends

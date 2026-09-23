@@ -338,7 +338,12 @@ impl EspHomeApi {
         // tight loop; with 16 the channel overflows on any brief write-loop
         // stall and consumers using try_send would see Full errors.
         let (answer_messages_tx, mut answer_messages_rx) = mpsc::channel::<ProtoMessage>(256);
-        let (outgoing_messages_tx, outgoing_messages_rx) = broadcast::channel::<ProtoMessage>(16);
+        // Capacity 128 (upstream: 16): an ESP that stalls and then flushes
+        // its backlog (40-60 frames in ~1ms, Sep 2026 incident) overflows a
+        // 16-slot ring and every consumer sees Lagged; 128 absorbs the
+        // largest observed burst with headroom. Consumers still must treat
+        // Lagged as non-fatal (see heatingrod clients.rs rx_err_fatal).
+        let (outgoing_messages_tx, outgoing_messages_rx) = broadcast::channel::<ProtoMessage>(128);
 
         #[allow(deprecated)]
         let device_info = DeviceInfoResponse {
