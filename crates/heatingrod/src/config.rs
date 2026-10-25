@@ -156,6 +156,13 @@ pub struct ControlSection {
     pub internal_cutoff_power_threshold: f64,
     pub internal_cutoff_duration: f64,
     pub internal_cutoff_recovery_temp: f64,
+    /// Grid heating (Netz-Solltemperatur > 0): rod power while the tank is
+    /// below the setpoint, PV surplus on top is still used.
+    pub grid_heat_power_watts: f64,
+    /// Start below setpoint − hysteresis, stop at the setpoint.
+    pub grid_heat_hysteresis: f64,
+    /// Upper clamp for the setpoint (rod's analog limiter sits at ~67°C).
+    pub grid_heat_max_setpoint: f64,
 }
 
 impl Default for ControlSection {
@@ -182,6 +189,9 @@ impl Default for ControlSection {
             internal_cutoff_power_threshold: 200.0,
             internal_cutoff_duration: 60.0,
             internal_cutoff_recovery_temp: 60.0,
+            grid_heat_power_watts: 7500.0,
+            grid_heat_hysteresis: 3.0,
+            grid_heat_max_setpoint: 70.0,
         }
     }
 }

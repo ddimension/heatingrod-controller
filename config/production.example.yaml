@@ -38,6 +38,9 @@ control:
   max_power_watts: 7500
   power_use_factor: 0.9
   tank_temp_limit: 85.0
+  grid_heat_power_watts: 7500
+  grid_heat_hysteresis: 3.0
+  grid_heat_max_setpoint: 70.0
   sensor_max_age_seconds: 60
   watchdog_interval: 10
   feedback_tolerance_watts: 100
@@ -356,6 +359,21 @@ sensor:
   accuracy_decimals: 1
   device_id: 0
 - platform: controller
+  name: Steuerung Netzmehrbezug Energie heute
+  object_id: ctrl_overdraw_energy_today
+  field: overdraw_energy_today
+  unit_of_measurement: Wh
+  device_class: energy
+  state_class: total_increasing
+  accuracy_decimals: 1
+  device_id: 0
+- platform: controller
+  name: Steuerung Netz-Nachheizung
+  object_id: ctrl_grid_heating
+  field: grid_heating
+  icon: mdi:transmission-tower-import
+  device_id: 0
+- platform: controller
   name: Steuerung Regeldelay
   object_id: ctrl_feedback_delay
   field: feedback_delay
@@ -614,6 +632,15 @@ binary_sensor:
   object_id: sorel_relais_r2
   topic: ltdc/DLG_RELAY/2/switched
   device_id: 3
+number:
+- name: Heizstab Netz-Solltemperatur
+  object_id: ctrl_grid_heat_setpoint
+  min_value: 0
+  max_value: 70
+  step: 1
+  unit_of_measurement: °C
+  mode: 1
+  device_id: 0
 powerlogger:
   host: powerlogger.kalnet.hooya.de
   entity_object_id: aktueller_verbrauch

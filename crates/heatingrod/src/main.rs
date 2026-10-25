@@ -38,6 +38,10 @@ use hardware::slcan;
 
 const STATUS_INTERVAL: f64 = 60.0;
 const FULL_PUSH_INTERVAL: f64 = 30.0;
+/// Grid energy counters → state.json (also on shutdown and day change).
+const PERSIST_INTERVAL: f64 = 300.0;
+/// Number entity carrying the Netz-Solltemperatur (production config).
+const GRID_HEAT_NUMBER: &str = "ctrl_grid_heat_setpoint";
 
 /// Operator decision (04.09.2026), deviation from Python: the controller
 /// works on its DIRECT connections (powerlogger/DS100/1-Wire), so a HA
@@ -695,6 +699,62 @@ fn handle_climate_command(
     }
 }
 
+/// HA number command → Netz-Solltemperatur (persisted immediately).
+fn handle_number_command(
+    controller: &mut Controller,
+    bridge: &Arc<Mutex<Bridge>>,
+    key: u32,
+    value: f32,
+    state_file: &PathBuf,
+) {
+    let bridge = bridge.lock().expect("bridge lock");
+    match bridge.number_object_id(key) {
+        Some(GRID_HEAT_NUMBER) => {
+            let sp = controller.set_grid_heat_setpoint(value as f64);
+            state::update(state_file, |s| s.grid_heat_setpoint = sp);
+            bridge.update_number_by_object_id(GRID_HEAT_NUMBER, sp);
+        }
+        Some(other) => tracing::warn!("Number command for unhandled entity {other}"),
+        None => tracing::warn!("Number command for unknown key {key}"),
+    }
+}
+
+fn handle_command(
+    controller: &mut Controller,
+    bridge: &Arc<Mutex<Bridge>>,
+    cmd: Command,
+    state_file: &PathBuf,
+    ksk: &Arc<Mutex<KaskadeShared>>,
+) {
+    match cmd {
+        Command::Climate {
+            key,
+            mode,
+            target_temperature,
+        } => handle_climate_command(controller, bridge, key, mode, target_temperature, state_file, ksk),
+        Command::Number { key, value } => {
+            handle_number_command(controller, bridge, key, value, state_file)
+        }
+    }
+}
+
+/// Local calendar day as YYYYMMDD (musl/glibc read /etc/localtime).
+fn local_day_key(now: f64) -> i64 {
+    let t = now as libc::time_t;
+    // SAFETY: localtime_r writes only into the provided, zeroed tm.
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    unsafe { libc::localtime_r(&t, &mut tm) };
+    (tm.tm_year as i64 + 1900) * 10000 + (tm.tm_mon as i64 + 1) * 100 + tm.tm_mday as i64
+}
+
+fn persist_grid_energy(controller: &Controller, state_file: &PathBuf) {
+    state::update(state_file, |s| {
+        s.overdraw_energy_wh = controller.overdraw_energy_wh;
+        s.overdraw_today_wh = controller.overdraw_today_wh;
+        s.overdraw_day = controller.overdraw_day;
+    });
+}
+
 fn run_controller_thread(parts: ControllerParts) {
     let mut controller = Controller::new(
         parts.config.clone(),
@@ -715,14 +775,7 @@ fn run_controller_thread(parts: ControllerParts) {
         let ksk = parts.ksk.clone();
         controller.calibration_hook = Some(Box::new(move |c: &mut Controller| {
             while let Ok(cmd) = rx.lock().expect("cmd rx").try_recv() {
-                if let Command::Climate {
-                    key,
-                    mode,
-                    target_temperature,
-                } = cmd
-                {
-                    handle_climate_command(c, &bridge, key, mode, target_temperature, &state_file, &ksk);
-                }
+                handle_command(c, &bridge, cmd, &state_file, &ksk);
             }
         }));
     }
@@ -757,6 +810,27 @@ fn run_controller_thread(parts: ControllerParts) {
         }
     }
 
+    // Netz-Solltemperatur + grid energy counters survive restarts.
+    {
+        let st = state::load(&parts.state_file);
+        controller.set_grid_heat_setpoint(st.grid_heat_setpoint);
+        controller.overdraw_energy_wh = st.overdraw_energy_wh;
+        controller.overdraw_today_wh = st.overdraw_today_wh;
+        controller.overdraw_day = st.overdraw_day;
+        controller.roll_overdraw_day(local_day_key(system_now()));
+        tracing::info!(
+            "state.json: Netz-Solltemperatur={:.0}°C, Netzbezug heute={:.0}Wh gesamt={:.0}Wh",
+            controller.grid_heat_setpoint,
+            controller.overdraw_today_wh,
+            controller.overdraw_energy_wh
+        );
+        parts
+            .bridge
+            .lock()
+            .expect("bridge lock")
+            .update_number_by_object_id(GRID_HEAT_NUMBER, controller.grid_heat_setpoint);
+    }
+
     let io = BridgeIo {
         bridge: parts.bridge.clone(),
         config: parts.config.clone(),
@@ -773,28 +847,14 @@ fn run_controller_thread(parts: ControllerParts) {
     let mut last_full_push = 0.0;
     let mut last_status = 0.0;
     let mut last_climate_echo: Option<(i32, i32)> = None;
+    let mut last_persist = system_now();
 
     while !parts.stop.load(Ordering::Relaxed) {
         let now = system_now();
 
         // Climate commands from HA (server → channel → here)
         while let Ok(cmd) = parts.command_rx.lock().expect("cmd rx").try_recv() {
-            if let Command::Climate {
-                key,
-                mode,
-                target_temperature,
-            } = cmd
-            {
-                handle_climate_command(
-                    &mut controller,
-                    &parts.bridge,
-                    key,
-                    mode,
-                    target_temperature,
-                    &parts.state_file,
-                    &parts.ksk,
-                );
-            }
+            handle_command(&mut controller, &parts.bridge, cmd, &parts.state_file, &parts.ksk);
         }
 
         // DS100 power cadence (~100ms, Python `_on_ds100_power` feed)
@@ -860,6 +920,15 @@ fn run_controller_thread(parts: ControllerParts) {
                 } else {
                     "ha"
                 };
+                let gh = if controller.grid_heat_setpoint > 0.0 {
+                    format!(
+                        "{:.0}°C/{}",
+                        controller.grid_heat_setpoint,
+                        if controller.grid_heating { "on" } else { "off" }
+                    )
+                } else {
+                    "off".to_string()
+                };
                 let delay = if controller.feedback_delay_count > 0 {
                     format!("{:.0}ms", controller.feedback_delay_ewma * 1000.0)
                 } else {
@@ -917,7 +986,7 @@ fn run_controller_thread(parts: ControllerParts) {
                     None => "?",
                 };
                 tracing::info!(
-                    "STATUS | {state_str} | grid={}W({grid_src}) pv={}W rod={}W/{}°C tank={}°C dac={:.1}V/{:.0}% delay={delay} | hapi={hapi} pl={pl_ok},msgs={pl_msgs},intv={pl_intv} ds100={ds_v}V,{ds_hz}Hz,mbus={ds_msgs},{ds_errs}e cbus={c_ok},pkts={c_pkts},errs={c_errs} 1wir={w_total}/{w_errs}e,cyc={w_cyc},{w_ms:.0}ms idac={idac} pc1={:.0}°C ksk={ksk} srl={srl}",
+                    "STATUS | {state_str} | grid={}W({grid_src}) pv={}W rod={}W/{}°C tank={}°C dac={:.1}V/{:.0}% delay={delay} gh={gh} gkwh={:.2}/{:.1} | hapi={hapi} pl={pl_ok},msgs={pl_msgs},intv={pl_intv} ds100={ds_v}V,{ds_hz}Hz,mbus={ds_msgs},{ds_errs}e cbus={c_ok},pkts={c_pkts},errs={c_errs} 1wir={w_total}/{w_errs}e,cyc={w_cyc},{w_ms:.0}ms idac={idac} pc1={:.0}°C ksk={ksk} srl={srl}",
                     fmt(grid, 0),
                     fmt(pv, 0),
                     fmt(rod, 0),
@@ -925,8 +994,22 @@ fn run_controller_thread(parts: ControllerParts) {
                     fmt(tank, 1),
                     controller.dac.current_voltage(),
                     controller.dac.current_level() * 100.0,
+                    controller.overdraw_today_wh / 1000.0,
+                    controller.overdraw_energy_wh / 1000.0,
                     controller.dac.current_voltage_ch1() * 10.0
                 );
+            }
+
+            // Daily counter rollover + periodic persistence of the grid
+            // energy counters (independent of grid freshness/calibration).
+            let day = local_day_key(now);
+            if day != controller.overdraw_day {
+                controller.roll_overdraw_day(day);
+                persist_grid_energy(&controller, &parts.state_file);
+                last_persist = now;
+            } else if now - last_persist >= PERSIST_INTERVAL {
+                persist_grid_energy(&controller, &parts.state_file);
+                last_persist = now;
             }
 
             // Climate echo (Python `_on_dac_change`): action reflects the
@@ -1051,6 +1134,8 @@ fn run_controller_thread(parts: ControllerParts) {
                     push("pv_power", p);
                 }
                 push("overdraw_energy", controller.overdraw_energy_wh);
+                push("overdraw_energy_today", controller.overdraw_today_wh);
+                push("grid_heating", if controller.grid_heating { 1.0 } else { 0.0 });
                 push("feedback_delay", controller.feedback_delay_ewma * 1000.0);
                 push("uptime", now - controller.start_time);
                 // Python `"overdraw"`: grid only while actually heating.
@@ -1091,6 +1176,7 @@ fn run_controller_thread(parts: ControllerParts) {
 
     // Graceful shutdown: CH0 → 0V, CH1 → safe (Python emergency + atexit).
     controller.emergency_shutdown("shutdown");
+    persist_grid_energy(&controller, &parts.state_file);
     let dac = &mut controller.dac;
     dac.shutdown();
     tracing::info!("Controller stopped");
@@ -1541,5 +1627,39 @@ mod tests {
     fn ha_subscriber_loss_does_not_emergency() {
         assert_eq!(watchdog_ha_policy(true, 0), None);
         assert_eq!(watchdog_ha_policy(false, 0), None);
+    }
+
+    #[test]
+    fn grid_heat_number_command_sets_and_persists() {
+        use super::*;
+        use esphome_api_server::keys::entity_key;
+        use hardware::MockDac;
+
+        let path = std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../config/production.example.yaml"
+        ));
+        let config = Config::load(path).expect("example config parses");
+        let (tx, _rx) = mpsc::channel(16);
+        let (htx, _hrx) = mpsc::channel(16);
+        let bridge = Arc::new(Mutex::new(Bridge::build(&config, tx, htx).expect("bridge")));
+        let cal = CalibrationManager::new("/tmp/hr-gh-cal.json", 7, 0.3, 0.3, 10.0);
+        let mut controller = Controller::new(config, Box::new(MockDac::new(10.0)), cal, 0.0);
+
+        let dir = std::env::temp_dir().join(format!("hr-gh-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let state_file = dir.join("state.json");
+        let _ = std::fs::remove_file(&state_file);
+
+        let key = entity_key(GRID_HEAT_NUMBER);
+        handle_number_command(&mut controller, &bridge, key, 45.0, &state_file);
+        assert_eq!(controller.grid_heat_setpoint, 45.0);
+        assert_eq!(state::load(&state_file).grid_heat_setpoint, 45.0);
+        // CH1 untouched by the number write → still falls back to safe
+        assert_eq!(state::load_ch1_voltage(&state_file, 6.0), 6.0);
+
+        // Out of range is clamped to grid_heat_max_setpoint
+        handle_number_command(&mut controller, &bridge, key, 90.0, &state_file);
+        assert_eq!(state::load(&state_file).grid_heat_setpoint, 70.0);
     }
 }

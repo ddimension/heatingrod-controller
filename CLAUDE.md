@@ -59,7 +59,9 @@ Prädiktiver Scheduler (HA PyScript) steuert Ölbrenner vorausschauend basierend
 
 ## Sicherheitsregeln (KRITISCH)
 1. DAC MUSS bei Programmende/Fehler/Disconnect auf 0V gesetzt werden
-2. Heizstab darf NUR bei PV-Überschuss laufen
+2. Heizstab darf NUR bei PV-Überschuss laufen — einzige Ausnahme (Operator-Entscheidung
+   25.10.2026): **Netz-Nachheizung**, solange `speicher_oben` unter der Netz-Solltemperatur
+   liegt (Scheduler-Modus `HEIZSTAB_ONLY`, siehe unten)
 3. Bei fehlenden/veralteten Messdaten (>30s): sofort abschalten
 4. Sensor-Fault: DS100-Power null während Heizen → sofort abschalten. Tank-Temp null → nur loggen, weiter heizen (analoge Thermalsperre schützt)
 5. Bei Fehlern: Notification über HA `notify.signal_haus` senden — **derzeit auf
@@ -140,6 +142,12 @@ grafana/                     heizung.json, sorel.json, ds100.json
 8. **Luft-Erkennung**: Warmwasser-Temperatureinbruch >10°C in 5s bei laufender Pumpe → Notification (CAN-Pfad)
 9. **Manueller Schalter**: `input_boolean.heizstab_schalter` in HA → wenn off, kein Heizen
 10. **ExecStopPost**: Systemd ruft `tools/dac-safe` (CH0=0V/CH1=6V direkt per I2C) falls Prozess crasht
+11. **Netz-Nachheizung**: Number `ctrl_grid_heat_setpoint` („Heizstab Netz-Solltemperatur“,
+    0 = aus, max `control.grid_heat_max_setpoint` 70°C, persistent in `state.json`).
+    `speicher_oben` < Soll − `grid_heat_hysteresis` (3K) → Heizstab mit
+    `max(PV-Ziel, grid_heat_power_watts)` (7,5kW) trotz Netzbezug bis zum Soll.
+    Ohne Tank-Temperatur keine Netz-Nachheizung; manueller Schalter, Stale-Abschaltung,
+    Tank-Limit und Thermosperren-Erkennung gelten unverändert; keine Kalibrierung währenddessen.
 
 ### Echtzeit-Feedback & Regeldelay
 - **100ms Power-Polling**: DS100 liefert Wirkleistung alle 100ms via `_on_ds100_power` Callback
@@ -163,7 +171,7 @@ Python v2 nutzt weiterhin libowcapi):
 
 ## ESPHome Native API (Server, Port 6053)
 
-- **71 Entities, 5 Sub-Devices**: Controller(0), DS100(1), Thyristor(2), SOREL(3), 1-Wire(4)
+- **74 Entities, 5 Sub-Devices**: Controller(0), DS100(1), Thyristor(2), SOREL(3), 1-Wire(4)
 - **Entity-Keys**: MD5(object_id) erste 8 Hex als u32 (HA-Identität!), nicht FNV-1
 - **MAC UPPERCASE** (`B8:27:EB:96:AE:00`): sonst bricht die HA-Legacy-Migration
   (Vorfall 18.08.2026, damals Python; v3 übernimmt die MAC exakt → kein
@@ -196,7 +204,11 @@ Python v2 nutzt weiterhin libowcapi):
 ## ProControl CH1 & Kaskadeneingang
 
 - **CH1-Persistenz**: `state.json` (neben `calibration.json`) speichert DAC CH1
-  (0-10V = 0-100°C HK1-Sollwert); Restore beim Start, Push an HA nach Bridge-Start
+  (0-10V = 0-100°C HK1-Sollwert); Restore beim Start, Push an HA nach Bridge-Start.
+  Außerdem: Netz-Solltemperatur und Netzbezugszähler des Heizstabs
+  (`ctrl_overdraw_energy` gesamt, `ctrl_overdraw_energy_today` mit Reset um Mitternacht
+  Ortszeit; Wh, `min(Netzbezug, Heizstableistung)` integriert) — gespeichert alle 5 min,
+  beim Tageswechsel und beim Shutdown; Schreiben atomar (tmp + rename)
 - **Kaskade (Brennersperre)**: ESP8266-Relais steuert KN/KL (230V) —
   `esp-heizung-ksk.kalnet.hooya.de:6053`, Noise-Key in Config.
   CH1 < 0,05V → Switch ON (gesperrt); CH1 > 0 → OFF (frei).
@@ -210,7 +222,7 @@ Python v2 nutzt weiterhin libowcapi):
   Felder: `MESSAGE`, `PRIORITY` (DEBUG=7/INFO=6/WARNING=4/ERROR=3), `SYSLOG_IDENTIFIER=heatingrod`,
   `TARGET` (Modulpfad), `CODE_FILE/LINE`. Ohne journald-Socket (OpenWrt): Stderr-Fallback.
 - **STATUS-Log** alle 60s bedingungslos (Operator-Entscheidung):
-  `STATUS | state | grid=XW(pl|ha) pv=XW rod=XW/X°C tank=X°C dac=XV/X% delay=Xms | hapi= pl=ok,msgs=N,intv=Xs ds100=V,Hz,mbus=N,Ne cbus=ok,pkts=N,errs=N 1wir=N/Ne,cyc=N,Nms idac= pc1=X°C ksk=`
+  `STATUS | state | grid=XW(pl|ha) pv=XW rod=XW/X°C tank=X°C dac=XV/X% delay=Xms gh=XX°C/on|off gkwh=heute/gesamt | hapi= pl=ok,msgs=N,intv=Xs ds100=V,Hz,mbus=N,Ne cbus=ok,pkts=N,errs=N 1wir=N/Ne,cyc=N,Nms idac= pc1=X°C ksk=`
 - **Watchdog** arbeitet bei `subscribers==0` weiter (Direktverbindungen liefern die
   Daten) — nur Warnung, kein Emergency (anders als Python v2, dessen Sensoren durch HA kamen)
 - **Clients** (kaskade/powerlogger): alle 15s PingRequest, Pong-Deadline 10s →
@@ -227,7 +239,7 @@ journalctl -u heatingrod-controller-v3 -p warning # nur Warnungen
 
 ```bash
 # Dev-Maschine: Rust stable (rust-toolchain.toml), zig 0.14.1 in ~/.local/opt
-cargo test --workspace                     # 175 Tests
+cargo test --workspace                     # 194 Tests
 
 # Release für den Pi (aarch64, statisch musl):
 cargo zigbuild --release --target aarch64-unknown-linux-musl -p heatingrod
@@ -257,7 +269,13 @@ PyScript: climate.set_temperature(..., temperature=60)
 ```
 
 ### State Machine
-- **DISABLED / NORMAL / SOLAR_PREPARE / SOLAR_HEATING / LEGIONELLA / EMERGENCY**
+- **DISABLED / NORMAL / SOLAR_PREPARE / SOLAR_HEATING / LEGIONELLA / EMERGENCY / HEIZSTAB_ONLY**
+- **HEIZSTAB_ONLY** (nur manuell, wird nie automatisch verlassen): Brenner gesperrt,
+  Netz-Solltemperatur 48°C (→ Nachheizung ab < 45°C). Legionellen-Lauf mit Heizstab:
+  Soll 70°C (Heizstab läuft bis an die Thermosperre), erledigt bei `tank_top` ≥ 63°C,
+  Abbruch nach 8h (neuer Versuch nach 24h). Letzte Reserve: `tank_top` < 40°C → Brenner
+  frei bis 45°C. In allen anderen Modi (außer DISABLED) setzt der Scheduler die
+  Netz-Solltemperatur auf 0
 - **NORMAL → SOLAR_PREPARE**: 18–22h, solar_tomorrow ≥ 8 kWh, morning_temp ≥ 45°C
 - **NORMAL → SOLAR_HEATING**: 8–16h, PV > 1500W (`SOLAR_BOOST_MIN_W`), tank_rod < 60°C
 - **SOLAR_PREPARE → SOLAR_HEATING**: 6–16h, PV > 500W, tank_rod < 60°C

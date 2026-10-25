@@ -48,6 +48,8 @@ pub struct Bridge {
     topic_keys: HashMap<String, (u32, TopicKind)>,
     /// 1-Wire address (lowercase, dots) → sensor key.
     address_keys: HashMap<String, u32>,
+    /// number key → object_id (HA number commands are routed by object_id).
+    number_object_ids: HashMap<u32, String>,
     /// climate key → binding.
     climates: HashMap<u32, ClimateBinding>,
     /// HA entity_id → climate key, for current_temperature forwarding.
@@ -153,6 +155,7 @@ impl Bridge {
             }
         }
 
+        let mut number_object_ids = HashMap::new();
         for def in &config.number {
             let mut n = NumberEntity::new(&def.name);
             set_object_id(&mut n.object_id, &mut n.key, &def.object_id);
@@ -162,7 +165,9 @@ impl Bridge {
             n.unit_of_measurement = def.unit_of_measurement.clone();
             n.mode = def.mode;
             n.device_id = def.device_id;
+            let object_id = n.object_id.clone();
             let key = server.add_number(n);
+            number_object_ids.insert(key, object_id);
             // Seed an initial state so HA does not show "unknown" forever
             // (Python semantics: missing_state until first set_state).
             server.update_number(key, 0.0);
@@ -216,6 +221,7 @@ impl Bridge {
             ds100_field_keys,
             topic_keys,
             address_keys,
+            number_object_ids,
             climates,
             climate_temp_map,
             onewire_device_id,
@@ -285,6 +291,19 @@ impl Bridge {
         self.address_keys.insert(addr_lc, key);
         tracing::info!("Auto-registered 1-Wire sensor {address} as {key:#x}");
         self.server.update_sensor(key, SensorValue::Number(temperature));
+    }
+
+    // ---- number helpers ----
+
+    pub fn number_object_id(&self, key: u32) -> Option<&str> {
+        self.number_object_ids.get(&key).map(String::as_str)
+    }
+
+    /// Echo a number state by object_id (no-op if not configured).
+    pub fn update_number_by_object_id(&self, object_id: &str, value: f64) {
+        if let Some((&key, _)) = self.number_object_ids.iter().find(|(_, o)| *o == object_id) {
+            self.server.update_number(key, value);
+        }
     }
 
     // ---- climate helpers ----

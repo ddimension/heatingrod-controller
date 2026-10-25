@@ -2,7 +2,8 @@
 //!
 //! Safety invariants (CLAUDE.md, must never regress):
 //! - DAC CH0 → 0V on every error/stale-sensor/HA-disconnect path
-//! - heat only on PV surplus (hysteresis power_limit_start/stop)
+//! - heat only on PV surplus (hysteresis power_limit_start/stop) — sole
+//!   exception: grid heating while the tank is below the Netz-Solltemperatur
 //! - internal cutoff detection (smooth < 50% of calibration-expected power)
 //! - tank temp null → warn once and continue (analog limiter protects)
 //! - rod power null while heating → shut down
@@ -45,7 +46,14 @@ pub struct Controller {
     pub last_esphome_full_push: f64,
     pub start_time: f64,
     pub overdraw_energy_wh: f64,
+    /// Grid energy into the rod on `overdraw_day` (local YYYYMMDD).
+    pub overdraw_today_wh: f64,
+    pub overdraw_day: i64,
     pub last_overdraw_ts: f64,
+    /// Netz-Solltemperatur (°C) from HA/state.json, 0 = off.
+    pub grid_heat_setpoint: f64,
+    /// Tank below the setpoint (with hysteresis): heat from the grid.
+    pub grid_heating: bool,
     pub grid_source: String,
     pub co2_start_energy: Option<f64>,
 
@@ -90,7 +98,11 @@ impl Controller {
             last_esphome_full_push: 0.0,
             start_time: now,
             overdraw_energy_wh: 0.0,
+            overdraw_today_wh: 0.0,
+            overdraw_day: 0,
             last_overdraw_ts: 0.0,
+            grid_heat_setpoint: 0.0,
+            grid_heating: false,
             grid_source: "none".into(),
             co2_start_energy: None,
             stop_flag: None,
@@ -130,6 +142,66 @@ impl Controller {
         self.dac.set_voltage(0.0);
         self.heating_active = false;
         self.target_power = 0.0;
+    }
+
+    /// Set the Netz-Solltemperatur (clamped 0..grid_heat_max_setpoint).
+    /// Returns the value actually applied.
+    pub fn set_grid_heat_setpoint(&mut self, celsius: f64) -> f64 {
+        let sp = celsius.clamp(0.0, self.config.control.grid_heat_max_setpoint);
+        if sp != self.grid_heat_setpoint {
+            tracing::info!("Netz-Solltemperatur: {:.0}°C → {sp:.0}°C", self.grid_heat_setpoint);
+            self.grid_heat_setpoint = sp;
+        }
+        sp
+    }
+
+    /// Start a new local day for the daily grid-energy counter.
+    pub fn roll_overdraw_day(&mut self, day: i64) {
+        if day != self.overdraw_day {
+            if self.overdraw_day != 0 {
+                tracing::info!(
+                    "Netzbezug Heizstab {}: {:.0}Wh (gesamt {:.0}Wh)",
+                    self.overdraw_day,
+                    self.overdraw_today_wh,
+                    self.overdraw_energy_wh
+                );
+            }
+            self.overdraw_day = day;
+            self.overdraw_today_wh = 0.0;
+        }
+    }
+
+    /// Grid heating demand: start below setpoint − hysteresis, stop at the
+    /// setpoint. Without a tank temperature there is no grid heating (PV
+    /// heating continues, the analog limiter protects).
+    fn update_grid_heating(&mut self, tank_temp: Option<f64>) -> bool {
+        let sp = self.grid_heat_setpoint;
+        let active = match tank_temp {
+            Some(t) if sp > 0.0 => {
+                if self.grid_heating {
+                    t < sp
+                } else {
+                    t < sp - self.config.control.grid_heat_hysteresis
+                }
+            }
+            _ => false,
+        };
+        if active != self.grid_heating {
+            match (active, tank_temp) {
+                (true, Some(t)) => tracing::warn!(
+                    "Netz-Nachheizung AN: tank={t:.1}°C < {sp:.0}°C − {:.0}K",
+                    self.config.control.grid_heat_hysteresis
+                ),
+                (_, Some(t)) => {
+                    tracing::info!("Netz-Nachheizung AUS: tank={t:.1}°C, soll={sp:.0}°C")
+                }
+                (_, None) => {
+                    tracing::warn!("Netz-Nachheizung AUS: Tank-Temperatur nicht verfügbar")
+                }
+            }
+            self.grid_heating = active;
+        }
+        active
     }
 
     fn stop_heating(&mut self, reason: &str) {
@@ -279,7 +351,11 @@ impl Controller {
             -grid_power + current_consumption
         };
 
-        if grid_power > -cfg.control.power_limit_stop {
+        // Grid heating bypasses the surplus hysteresis; PV surplus above
+        // the grid-heating power is still used.
+        let grid_heat = self.update_grid_heating(tank_temp);
+
+        if !grid_heat && grid_power > -cfg.control.power_limit_stop {
             if self.heating_active {
                 self.stop_heating(&format!(
                     "Surplus below stop threshold (grid={grid_power:.0}W), shutting down heater"
@@ -288,12 +364,17 @@ impl Controller {
             return;
         }
 
-        if grid_power > cfg.control.power_limit_start && !self.heating_active {
+        if !grid_heat && grid_power > cfg.control.power_limit_start && !self.heating_active {
             return;
         }
 
-        let target_power = ((surplus + cfg.control.power_limit_start) * cfg.control.power_use_factor)
-            .clamp(0.0, cfg.control.max_power_watts);
+        let pv_target = (surplus + cfg.control.power_limit_start) * cfg.control.power_use_factor;
+        let target_power = if grid_heat {
+            pv_target.max(cfg.control.grid_heat_power_watts)
+        } else {
+            pv_target
+        }
+        .clamp(0.0, cfg.control.max_power_watts);
 
         if target_power < 200.0 {
             if self.heating_active {
@@ -319,8 +400,9 @@ impl Controller {
             return;
         }
 
-        // Calibration mode
-        if self.calibration.needs_recalibration()
+        // Calibration mode (PV only — the sweep aborts on grid import)
+        if !grid_heat
+            && self.calibration.needs_recalibration()
             && surplus >= cfg.calibration.min_power_for_calibration
         {
             let rod_fresh = io
@@ -370,8 +452,11 @@ impl Controller {
             Some(g) if g > 0.0 && power > 0.0 => {
                 let od = g.min(power);
                 if self.last_overdraw_ts > 0.0 {
-                    let dt_h = (now - self.last_overdraw_ts) / 3600.0;
+                    // Cap the step: a DS100 gap must not be booked as
+                    // overdraw at the last value (counters are persistent).
+                    let dt_h = (now - self.last_overdraw_ts).clamp(0.0, 5.0) / 3600.0;
                     self.overdraw_energy_wh += od * dt_h;
+                    self.overdraw_today_wh += od * dt_h;
                 }
                 od
             }
@@ -1094,6 +1179,150 @@ mod tests {
     }
 
     // PathBuf import used for potential state-file tests later.
+    // ---- Grid heating (Netz-Solltemperatur) ----
+
+    fn set_tank(ctrl: &Controller, env: &mut MockEnv, t: f64) {
+        env.set(&ctrl.config.ha_entities.tank_top_temperature.clone(), Some(t));
+    }
+
+    #[test]
+    fn grid_heat_starts_below_setpoint_minus_hysteresis() {
+        let (mut ctrl, mut env) = make_controller();
+        set_calibration(&mut ctrl);
+        set_base_sensors(&ctrl, &mut env);
+        env.set(&ctrl.config.ha_entities.grid_power.clone(), Some(500.0));
+        ctrl.set_grid_heat_setpoint(45.0);
+
+        // 43°C: inside the hysteresis band → no start
+        set_tank(&ctrl, &mut env, 43.0);
+        ctrl.control_loop(&mut env, &mut no_sleep);
+        assert!(!ctrl.heating_active);
+
+        // 41.5°C: below 45 − 3 → heat from the grid at full power
+        set_tank(&ctrl, &mut env, 41.5);
+        ctrl.control_loop(&mut env, &mut no_sleep);
+        assert!(ctrl.heating_active);
+        assert!(ctrl.grid_heating);
+        assert_eq!(ctrl.target_power, 7500.0);
+        assert!(ctrl.dac.current_voltage() > 0.0);
+    }
+
+    #[test]
+    fn grid_heat_runs_until_setpoint_then_stops() {
+        let (mut ctrl, mut env) = make_controller();
+        set_calibration(&mut ctrl);
+        set_base_sensors(&ctrl, &mut env);
+        env.set(&ctrl.config.ha_entities.grid_power.clone(), Some(7000.0));
+        ctrl.set_grid_heat_setpoint(45.0);
+        set_tank(&ctrl, &mut env, 40.0);
+        ctrl.control_loop(&mut env, &mut no_sleep);
+        assert!(ctrl.heating_active);
+
+        // Inside the band while heating: keeps going despite grid import
+        set_tank(&ctrl, &mut env, 44.0);
+        ctrl.control_loop(&mut env, &mut no_sleep);
+        assert!(ctrl.heating_active);
+
+        // Setpoint reached → grid import stops the rod as usual
+        set_tank(&ctrl, &mut env, 45.0);
+        ctrl.control_loop(&mut env, &mut no_sleep);
+        assert!(!ctrl.grid_heating);
+        assert!(!ctrl.heating_active);
+        assert_eq!(ctrl.dac.current_voltage(), 0.0);
+    }
+
+    #[test]
+    fn grid_heat_uses_larger_pv_target() {
+        let (mut ctrl, mut env) = make_controller();
+        ctrl.config.control.grid_heat_power_watts = 3000.0;
+        set_calibration(&mut ctrl);
+        set_base_sensors(&ctrl, &mut env);
+        ctrl.set_grid_heat_setpoint(45.0);
+        set_tank(&ctrl, &mut env, 40.0);
+        // 6000W surplus → PV target (6000 − 800) × 0.9 = 4680W > 3000W
+        env.set(&ctrl.config.ha_entities.grid_power.clone(), Some(-6000.0));
+        ctrl.control_loop(&mut env, &mut no_sleep);
+        assert!((ctrl.target_power - 4680.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn grid_heat_off_without_setpoint() {
+        let (mut ctrl, mut env) = make_controller();
+        set_calibration(&mut ctrl);
+        set_base_sensors(&ctrl, &mut env);
+        set_tank(&ctrl, &mut env, 30.0);
+        env.set(&ctrl.config.ha_entities.grid_power.clone(), Some(500.0));
+        ctrl.control_loop(&mut env, &mut no_sleep);
+        assert!(!ctrl.heating_active);
+    }
+
+    #[test]
+    fn grid_heat_needs_tank_temp() {
+        let (mut ctrl, mut env) = make_controller();
+        set_calibration(&mut ctrl);
+        set_base_sensors(&ctrl, &mut env);
+        env.set(&ctrl.config.ha_entities.grid_power.clone(), Some(7000.0));
+        ctrl.set_grid_heat_setpoint(45.0);
+        set_tank(&ctrl, &mut env, 40.0);
+        ctrl.control_loop(&mut env, &mut no_sleep);
+        assert!(ctrl.heating_active);
+
+        env.set(&ctrl.config.ha_entities.tank_top_temperature.clone(), None);
+        ctrl.control_loop(&mut env, &mut no_sleep);
+        assert!(!ctrl.grid_heating);
+        assert!(!ctrl.heating_active);
+    }
+
+    #[test]
+    fn grid_heat_respects_manual_switch_and_stale_grid() {
+        let (mut ctrl, mut env) = make_controller();
+        set_calibration(&mut ctrl);
+        set_base_sensors(&ctrl, &mut env);
+        ctrl.set_grid_heat_setpoint(45.0);
+        set_tank(&ctrl, &mut env, 40.0);
+        env.set_str(&ctrl.config.ha_entities.heatingrod_switch.clone(), Some("off"));
+        env.set(&ctrl.config.ha_entities.grid_power.clone(), Some(500.0));
+        ctrl.control_loop(&mut env, &mut no_sleep);
+        assert!(!ctrl.heating_active);
+
+        env.set_str(&ctrl.config.ha_entities.heatingrod_switch.clone(), Some("on"));
+        env.set(&ctrl.config.ha_entities.grid_power.clone(), None);
+        ctrl.control_loop(&mut env, &mut no_sleep);
+        assert!(!ctrl.heating_active);
+    }
+
+    #[test]
+    fn grid_heat_setpoint_is_clamped() {
+        let (mut ctrl, _env) = make_controller();
+        assert_eq!(ctrl.set_grid_heat_setpoint(95.0), 70.0);
+        assert_eq!(ctrl.set_grid_heat_setpoint(-5.0), 0.0);
+    }
+
+    #[test]
+    fn overdraw_counts_total_and_today() {
+        let (mut ctrl, mut env) = make_controller();
+        ctrl.roll_overdraw_day(20261025);
+        env.set(&ctrl.config.ha_entities.grid_power.clone(), Some(3000.0));
+        ctrl.on_ds100_power(&mut env, 7500.0);
+        env.advance(1.0);
+        env.set(&ctrl.config.ha_entities.grid_power.clone(), Some(3000.0));
+        ctrl.on_ds100_power(&mut env, 7500.0);
+        // min(grid, rod) = 3000W for 1s
+        let wh = 3000.0 / 3600.0;
+        assert!((ctrl.overdraw_energy_wh - wh).abs() < 1e-9);
+        assert!((ctrl.overdraw_today_wh - wh).abs() < 1e-9);
+
+        // A long DS100 gap is capped at 5s
+        env.advance(600.0);
+        env.set(&ctrl.config.ha_entities.grid_power.clone(), Some(3000.0));
+        ctrl.on_ds100_power(&mut env, 7500.0);
+        assert!((ctrl.overdraw_energy_wh - 6.0 * wh).abs() < 1e-9);
+
+        ctrl.roll_overdraw_day(20261026);
+        assert_eq!(ctrl.overdraw_today_wh, 0.0);
+        assert!((ctrl.overdraw_energy_wh - 6.0 * wh).abs() < 1e-9);
+    }
+
     #[allow(dead_code)]
     fn unused(_: PathBuf) {}
 }
