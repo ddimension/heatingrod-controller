@@ -148,6 +148,8 @@ grafana/                     heizung.json, sorel.json, ds100.json
     `max(PV-Ziel, grid_heat_power_watts)` (7,5kW) trotz Netzbezug bis zum Soll.
     Ohne Tank-Temperatur keine Netz-Nachheizung; manueller Schalter, Stale-Abschaltung,
     Tank-Limit und Thermosperren-Erkennung gelten unverändert; keine Kalibrierung währenddessen.
+    HA-Anzeige: Kachel „Heizstab Controller“ unter `/lovelace/heating`, Abschnitt
+    „Netzbezug Heizstab“ (Soll, Nachheizung aktiv, Netzbezug aktuell/heute/gesamt).
 
 ### Echtzeit-Feedback & Regeldelay
 - **100ms Power-Polling**: DS100 liefert Wirkleistung alle 100ms via `_on_ds100_power` Callback
@@ -180,6 +182,11 @@ Python v2 nutzt weiterhin libowcapi):
   gitignored); der Server lehnt Plaintext ab, sobald ein PSK gesetzt ist
 - **Entity-Identität hängt am Namen** (HA ≥ 2026.8): Umbenennen von `name:` legt
   eine neue Entity an — `object_id` nicht mehr ändern
+- **HA-Entity-IDs neuer Entities** werden aus Bereich + Gerät + Name gebildet, nicht aus
+  `object_id`: z.B. `number.heizungskeller_heizstab_controller_heizstab_netz_solltemperatur`,
+  `sensor.heizungskeller_heizstab_controller_steuerung_netzmehrbezug_energie_heute`.
+  Ältere Entities behalten ihre `ctrl_*`-IDs. Vor Verwendung in Scheduler/Dashboard die
+  echte ID aus der Entity-Registry holen
 - **Server antwortet auf PingRequest** (HA-Parität zu echten ESPs)
 
 ## Kalibrierung (Hybrid)
